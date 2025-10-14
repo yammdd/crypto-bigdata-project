@@ -1,8 +1,5 @@
-#version: '3.8'
-
 services:
 
-  # Zookeeper
   zookeeper:
     image: confluentinc/cp-zookeeper:7.5.0
     container_name: zookeeper
@@ -12,14 +9,13 @@ services:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
 
-  # Kafka
   kafka:
     image: confluentinc/cp-kafka:7.5.0
     depends_on:
       - zookeeper
     ports:
-      - "9092:9092"     # external access (e.g. from host)
-      - "29092:29092"   # internal access from other containers
+      - "9092:9092"     
+      - "29092:29092" 
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
@@ -28,8 +24,6 @@ services:
       KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_INTERNAL://0.0.0.0:29092
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT_INTERNAL
 
-
-  # Spark Master
   spark-master:
     build:
       context: .
@@ -41,6 +35,7 @@ services:
     volumes:
       - ./streaming:/opt/spark/work-dir/streaming
       - ./batch:/opt/spark/work-dir/batch
+      - ./models:/opt/spark/work-dir/models
     environment:
       - PYTHONPATH=/opt/spark/work-dir
     command: ["/opt/spark/bin/spark-submit", "/opt/spark/work-dir/streaming/spark_streaming.py"]
@@ -58,8 +53,6 @@ services:
     volumes:
       - ./streaming:/opt/spark/work-dir/streaming
 
-
-  # HDFS Namenode
   hdfs-namenode:
     image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
     container_name: hdfs-namenode
@@ -68,9 +61,8 @@ services:
     ports:
       - "9870:9870"
     volumes:
-      - namenode:/hadoop/dfs/name
+      - ./hadoop_data/namenode:/hadoop/dfs/name
 
-  # HDFS Datanode
   hdfs-datanode:
     image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
     container_name: hdfs-datanode
@@ -81,23 +73,19 @@ services:
     ports:
       - "9864:9864"
     volumes:
-      - datanode:/hadoop/dfs/data
+      - ./hadoop_data/datanode:/hadoop/dfs/data
 
-  # HBase
   hbase:
     image: dajobe/hbase:latest
     container_name: hbase
     ports:
-      - "16010:16010"  # Web UI
-      - "9090:9090"    # Thrift API
+      - "16010:16010" 
+      - "9090:9090"   
     environment:
       - HBASE_MANAGES_ZK=true
     volumes:
       - ./hbase-data:/opt/hbase-data
 
-
-
-  # MongoDB
   mongodb:
     image: mongo
     container_name: mongodb
@@ -123,7 +111,8 @@ services:
     depends_on:
       - hbase
 
-
 volumes:
   namenode:
+    driver: local
   datanode:
+    driver: local
