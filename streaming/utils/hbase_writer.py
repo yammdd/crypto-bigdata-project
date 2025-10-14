@@ -1,16 +1,26 @@
 import happybase
 import os
+import time
 
-# Hàm ghi một batch DataFrame vào HBase
+def ensure_table_exists(connection, table_name):
+    tables = [t.decode() for t in connection.tables()]
+    if table_name not in tables:
+        print(f"[AUTO] Creating HBase table {table_name}")
+        connection.create_table(
+            table_name,
+            {'data': dict(), 'meta': dict()}
+        )
+        time.sleep(2)  # HBase sync
+
 def write_to_hbase(batch_df, batch_id):
     if batch_df.rdd.isEmpty():
         return
 
-    # Kết nối HBase
     connection = happybase.Connection(host=os.getenv("HBASE_THRIFT_HOST", "hbase"), port=9090)
+    ensure_table_exists(connection, "crypto_prices")
+
     table = connection.table("crypto_prices")
 
-    # Với mỗi hàng trong DataFrame
     for row in batch_df.collect():
         row_key = f"{row['symbol']}_{row['timestamp']}"
         table.put(row_key, {
