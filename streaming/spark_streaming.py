@@ -1,13 +1,12 @@
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import from_json, col
 from pyspark.sql.types import StructType, StringType, FloatType, LongType
+from streaming.utils.hbase_writer import write_to_hbase
 
-# Tạo Spark session
 spark = SparkSession.builder \
     .appName("CryptoPriceStream") \
     .getOrCreate()
 
-# Schema JSON cho dữ liệu Kafka
 schema = StructType() \
     .add("source", StringType()) \
     .add("category", StringType()) \
@@ -24,7 +23,6 @@ schema = StructType() \
     .add("best_ask_price", FloatType()) \
     .add("timestamp", LongType())
 
-# Đọc từ Kafka
 df_raw = spark.readStream \
     .format("kafka") \
     .option("kafka.bootstrap.servers", "kafka:29092") \
@@ -32,16 +30,13 @@ df_raw = spark.readStream \
     .option("startingOffsets", "latest") \
     .load()
 
-# Parse JSON từ value
 df_parsed = df_raw.selectExpr("CAST(value AS STRING) as json") \
     .select(from_json(col("json"), schema).alias("data")) \
     .select("data.*")
 
-# In kết quả ra console (có thể thay bằng ghi HBase sau này)
 query = df_parsed.writeStream \
     .outputMode("append") \
-    .format("console") \
-    .option("truncate", False) \
+    .foreachBatch(write_to_hbase) \
     .start()
 
 query.awaitTermination()

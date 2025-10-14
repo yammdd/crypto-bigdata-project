@@ -1,0 +1,35 @@
+# --- Python ---
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+.env
+*.log
+
+# --- Docker volumes ---
+hbase-data/
+logs/
+tmp/
+*.pid
+
+# --- Jupyter/Streamlit cache ---
+.ipynb_checkpoints/
+*.sqlite3
+.cache/
+.streamlit/
+__pycache__/
+
+# --- IDE ---
+.vscode/
+.idea/
+*.swp
+
+# --- OS Files ---
+.DS_Store
+Thumbs.db
+
+# --- Node/npm (nếu dùng frontend sau này) ---
+node_modules/
+dist/
+build/

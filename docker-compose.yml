@@ -79,16 +79,29 @@ services:
       - datanode:/hadoop/dfs/data
 
   # HBase
+  # hbase:
+  #   image: harisekhon/hbase:latest
+  #   container_name: hbase
+  #   depends_on:
+  #     - zookeeper
+  #   environment:
+  #     - HBASE_MANAGES_ZK=false
+  #   ports:
+  #     - "16010:16010" 
+  #     - "9090:9090"    
+  #   volumes:
+  #     - ./hbase-data:/hbase
   hbase:
-    image: harisekhon/hbase:latest
+    image: dajobe/hbase:latest
     container_name: hbase
-    depends_on:
-      - zookeeper
-    environment:
-      - HBASE_MANAGES_ZK=false
     ports:
-      - "16010:16010"  # HBase Web UI
-      - "9090:9090"    # Thrift Server (nếu dùng)
+      - "16010:16010"  # UI
+      - "9090:9090"    # Thrift server
+    environment:
+      - HBASE_MANAGES_ZK=true
+    volumes:
+      - ./hbase-data:/opt/hbase/data
+
     
   # MongoDB
   mongodb:
