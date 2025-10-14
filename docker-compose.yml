@@ -40,6 +40,7 @@ services:
       - "8080:8080"
     volumes:
       - ./streaming:/opt/spark/work-dir/streaming
+      - ./batch:/opt/spark/work-dir/batch
     environment:
       - PYTHONPATH=/opt/spark/work-dir
     command: ["/opt/spark/bin/spark-submit", "/opt/spark/work-dir/streaming/spark_streaming.py"]
