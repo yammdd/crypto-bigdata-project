@@ -40,10 +40,11 @@ function createCard(symbol) {
   cards[symbol] = card;
 }
 
-async function updateCard(symbol) {
+// Hàm cập nhật dữ liệu thực tế (2s/lần)
+async function updateLive(symbol) {
   try {
-    const res1 = await fetch(`/api/crypto/${symbol}`);
-    const data = await res1.json();
+    const res = await fetch(`/api/crypto/${symbol}`);
+    const data = await res.json();
     const latest = Array.isArray(data) ? data.at(-1) : null;
 
     if (latest) {
@@ -52,25 +53,34 @@ async function updateCard(symbol) {
         if (el) el.textContent = `${attr.replace("data_", "").replace(/_/g, " ")}: ${latest[attr]}`;
       });
     }
+  } catch (err) {
+    console.error(`Live update error for ${symbol}:`, err);
+  }
+}
 
-    const res2 = await fetch(`/api/crypto/predictions/${symbol}`);
-    const pred = await res2.json();
+// Hàm cập nhật dự đoán (10s/lần)
+async function updatePrediction(symbol) {
+  try {
+    const res = await fetch(`/api/crypto/predictions/${symbol}`);
+    const pred = await res.json();
     const predEl = document.getElementById(`${symbol}_prediction`);
 
-    // 🔧 FIX: Dự đoán có thể là số 0, cần dùng !== undefined
     if (predEl && pred && pred.predicted_price !== undefined) {
       predEl.textContent = `Dự đoán (next): ${pred.predicted_price}`;
     }
   } catch (err) {
-    console.error(`Update error for ${symbol}:`, err);
+    console.error(`Prediction update error for ${symbol}:`, err);
   }
 }
 
 function main() {
   symbols.forEach(symbol => {
     createCard(symbol);
-    updateCard(symbol);
-    setInterval(() => updateCard(symbol), 2000);
+    updateLive(symbol);
+    updatePrediction(symbol);
+
+    setInterval(() => updateLive(symbol), 1500);
+    setInterval(() => updatePrediction(symbol), 5000);
   });
 }
 

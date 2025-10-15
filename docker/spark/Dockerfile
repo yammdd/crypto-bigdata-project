@@ -16,8 +16,6 @@ RUN curl -O https://downloads.apache.org/hadoop/common/hadoop-3.3.6/hadoop-3.3.6
     mv hadoop-3.3.6 /opt/hadoop && \
     ln -s /opt/hadoop/bin/hadoop /usr/bin/hadoop
 
-
-# Spark Kafka connectors
 ADD https://repo1.maven.org/maven2/org/apache/spark/spark-sql-kafka-0-10_2.12/3.4.1/spark-sql-kafka-0-10_2.12-3.4.1.jar /opt/spark/jars/
 ADD https://repo1.maven.org/maven2/org/apache/spark/spark-streaming-kafka-0-10-assembly_2.12/3.4.1/spark-streaming-kafka-0-10-assembly_2.12-3.4.1.jar /opt/spark/jars/
 ADD https://repo1.maven.org/maven2/org/apache/kafka/kafka-clients/3.4.0/kafka-clients-3.4.0.jar /opt/spark/jars/
@@ -25,14 +23,12 @@ ADD https://repo1.maven.org/maven2/org/apache/commons/commons-pool2/2.11.1/commo
 
 ENV SPARK_EXTRA_CLASSPATH="/opt/spark/jars/*"
 ENV PYTHONPATH="/opt/spark/work-dir"
-# Cài XGBoost4J-Spark
 ENV XGBOOST_VERSION=1.6.1
 ENV SCALA_VERSION=2.12
 ENV SPARK_VERSION=3.4.1
 
 RUN wget https://repo1.maven.org/maven2/ml/dmlc/xgboost4j-spark_${SCALA_VERSION}/${XGBOOST_VERSION}/xgboost4j-spark_${SCALA_VERSION}-${XGBOOST_VERSION}.jar -P /opt/spark/jars/ && \
     wget https://repo1.maven.org/maven2/ml/dmlc/xgboost4j_${SCALA_VERSION}/${XGBOOST_VERSION}/xgboost4j_${SCALA_VERSION}-${XGBOOST_VERSION}.jar -P /opt/spark/jars/
-
 
 RUN pip3 install happybase thrift yfinance xgboost pandas numpy scikit-learn joblib
 

@@ -11,6 +11,7 @@ services:
 
   kafka:
     image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka
     depends_on:
       - zookeeper
     ports:
@@ -93,6 +94,7 @@ services:
       - "27017:27017"
 
   producer:
+    container_name: crypto-producer
     build:
       context: ./docker/crypto-producer
     depends_on:
@@ -100,6 +102,7 @@ services:
     restart: unless-stopped
 
   flask:
+    container_name: crypto-dashboard
     build:
       context: .
       dockerfile: dashboard/Dockerfile

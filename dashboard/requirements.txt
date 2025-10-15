@@ -1,0 +1,5 @@
+flask
+happybase
+xgboost
+numpy
+joblib
