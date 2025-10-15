@@ -6,6 +6,6 @@ COPY dashboard /app
 COPY ../../dashboard/static /app/static
 COPY ../../models /app/models
 
-RUN pip install flask happybase
+RUN pip install flask happybase xgboost numpy joblib
 
 CMD ["python", "app.py"]

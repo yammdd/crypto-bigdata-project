@@ -5,7 +5,7 @@ import time
 from kafka import KafkaProducer
 
 BINANCE_WS = "wss://stream.binance.com:9443/ws"
-SYMBOLS = ["btcusdt", "ethusdt", "solusdt", "bnbusdt", "xrpusdt", "adausdt", "dogeusdt", "linkusdt", "dotusdt", "maticusdt"]
+SYMBOLS = ["btcusdt", "ethusdt", "solusdt", "bnbusdt", "xrpusdt", "adausdt", "dogeusdt", "linkusdt", "dotusdt", "ltcusdt"]
 
 producer = KafkaProducer(
     bootstrap_servers='kafka:29092',

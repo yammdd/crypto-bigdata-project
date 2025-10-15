@@ -16,7 +16,7 @@ symbol_map = {
     "dogeusdt": "DOGE-USD",
     "linkusdt": "LINK-USD",
     "dotusdt": "DOT-USD",
-    "maticusdt": "MATIC-USD"
+    "ltcusdt": "LTC-USD" 
 }
 
 # Output HDFS path

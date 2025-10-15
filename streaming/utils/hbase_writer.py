@@ -3,14 +3,20 @@ import os
 import time
 
 def ensure_table_exists(connection, table_name):
-    tables = [t.decode() for t in connection.tables()]
-    if table_name not in tables:
-        print(f"[AUTO] Creating HBase table {table_name}")
-        connection.create_table(
-            table_name,
-            {'data': dict(), 'meta': dict()}
-        )
-        time.sleep(2)  # HBase sync
+    """Tạo bảng HBase nếu chưa tồn tại."""
+    try:
+        tables = [t.decode() for t in connection.tables()]
+        if table_name not in tables:
+            print(f"[INIT] Creating HBase table: {table_name}")
+            connection.create_table(
+                table_name,
+                {"data": dict(),
+                 "meta": dict()}
+            )
+        else:
+            print(f"[INFO] Table {table_name} already exists - skipping creation.")
+    except Exception as e:
+        print(f"[WARN] HBase table check/create failed: {e}")
 
 def write_to_hbase(batch_df, batch_id):
     if batch_df.rdd.isEmpty():

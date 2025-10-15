@@ -34,7 +34,7 @@ RUN wget https://repo1.maven.org/maven2/ml/dmlc/xgboost4j-spark_${SCALA_VERSION}
     wget https://repo1.maven.org/maven2/ml/dmlc/xgboost4j_${SCALA_VERSION}/${XGBOOST_VERSION}/xgboost4j_${SCALA_VERSION}-${XGBOOST_VERSION}.jar -P /opt/spark/jars/
 
 
-RUN pip3 install happybase thrift yfinance xgboost pandas numpy scikit-learn
+RUN pip3 install happybase thrift yfinance xgboost pandas numpy scikit-learn joblib
 
 WORKDIR /opt/spark/work-dir
 

@@ -1,6 +1,6 @@
 const symbols = [
   "btcusdt", "ethusdt", "solusdt", "bnbusdt", "xrpusdt",
-  "adausdt", "dogeusdt", "linkusdt", "dotusdt", "maticusdt"
+  "adausdt", "dogeusdt", "linkusdt", "dotusdt", "ltcusdt"
 ];
 
 const attrs = [
@@ -56,7 +56,9 @@ async function updateCard(symbol) {
     const res2 = await fetch(`/api/crypto/predictions/${symbol}`);
     const pred = await res2.json();
     const predEl = document.getElementById(`${symbol}_prediction`);
-    if (predEl && pred?.predicted_price) {
+
+    // 🔧 FIX: Dự đoán có thể là số 0, cần dùng !== undefined
+    if (predEl && pred && pred.predicted_price !== undefined) {
       predEl.textContent = `Dự đoán (next): ${pred.predicted_price}`;
     }
   } catch (err) {
