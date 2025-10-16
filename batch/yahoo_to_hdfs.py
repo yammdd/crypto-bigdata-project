@@ -22,9 +22,8 @@ symbol_map = {
 # Output HDFS path
 output_dir = "hdfs://namenode:9000/crypto/yahoo"
 
-# Range to fetch: from Oct 2023 to Oct 2025 (you can change this)
-start_date = datetime(2023, 10, 1)
-end_date = datetime(2025, 10, 1)
+end_date = datetime.now()
+start_date = end_date - timedelta(days=365*2)
 
 # Initialize Spark
 spark = SparkSession.builder.appName("YahooFinanceBatch").getOrCreate()
@@ -65,7 +64,6 @@ for symbol_binance, symbol_yahoo in symbol_map.items():
 
     # Combine all monthly data
     all_df = pd.concat(monthly_dfs)
-    #all_df.columns = [c.lower().replace(' ', '_') for c in all_df.columns]
     all_df.columns = [c[0].lower().replace(' ', '_') if isinstance(c, tuple) else c.lower().replace(' ', '_') for c in all_df.columns]
 
     sdf = spark.createDataFrame(all_df)
@@ -74,7 +72,5 @@ for symbol_binance, symbol_yahoo in symbol_map.items():
 
     print(f"[INFO] Saving {symbol_binance} to {save_path}")
     print(f"[SUCCESS] {symbol_binance} written to HDFS")
-    #print("DEBUG: all_df.columns =", all_df.columns)
-    #print("DEBUG: type(all_df.columns[0]) =", type(all_df.columns[0]))
 
 spark.stop()

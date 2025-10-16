@@ -92,6 +92,8 @@ services:
     container_name: mongodb
     ports:
       - "27017:27017"
+    volumes:
+    - ./mongo-data:/data/db
 
   producer:
     container_name: crypto-producer
@@ -113,6 +115,19 @@ services:
       - HBASE_THRIFT_PORT=9090
     depends_on:
       - hbase
+      
+  streamlit:
+    build:
+      context: .
+      dockerfile: docker/streamlit/Dockerfile  # CHỈ dùng Dockerfile này
+    container_name: streamlit
+    ports:
+      - "8501:8501"
+    depends_on:
+      - mongodb
+    volumes:
+      - .:/app  # Đảm bảo batch/streamlit_batch_dashboard.py tồn tại trong container
+
 
 volumes:
   namenode:

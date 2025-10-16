@@ -10,6 +10,7 @@ __pycache__/
 # --- Docker volumes ---
 hbase-data/
 hadoop_data/
+mongo-data/
 models/
 logs/
 tmp/

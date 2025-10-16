@@ -63,8 +63,8 @@ for symbol in symbols:
         next_pred = float(model.predict(latest_features)[0])
         prediction_result = {
             "symbol": symbol,
-            "predicted_price": next_pred,
-            "rmse": rmse
+            "predicted_price": float(next_pred),
+            "rmse": float(rmse)
         }
 
         local_pred_path = f"/opt/spark/work-dir/models/xgboost_{symbol}_prediction.json"
