@@ -45,4 +45,7 @@ docker compose up -d --build
 vào frontend trên 
 `localhost:5000`
 
+batch layer trên
+`localhost:8501` (cái này vẫn còn lỗi, tính sau)
+
 hi vọng là chạy được trên máy ae hihihi
