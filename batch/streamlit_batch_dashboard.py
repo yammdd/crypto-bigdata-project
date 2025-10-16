@@ -1,76 +1,80 @@
-# batch/streamlit_batch_dashboard.py
-
 import streamlit as st
 from pymongo import MongoClient
 import pandas as pd
+import numpy as np
 import plotly.express as px
 
-st.set_page_config(layout="wide", page_title="Crypto Batch Predictions")
+st.set_page_config(layout="wide", page_title="Crypto Batch Dashboard")
 
-st.title("💹 Crypto Batch Insights")
-st.subheader("🔮 Long-term Predictions from Batch Layer (XGBoost)")
+st.title("Crypto Batch Analytics Dashboard")
+st.subheader("Long-term Predictions from Batch Layer (MongoDB)")
 
 # Kết nối MongoDB
-mongo_uri = "mongodb://mongodb:27017"
-client = MongoClient(mongo_uri)
+client = MongoClient("mongodb://mongodb:27017")
 collection = client["crypto_batch"]["predictions"]
 
-# Tải dữ liệu
+# Lấy dữ liệu
 data = list(collection.find())
 df = pd.DataFrame(data)
 
 if df.empty:
-    st.error("❌ Không tìm thấy dữ liệu trong MongoDB.")
+    st.error("Không tìm thấy dữ liệu trong MongoDB.")
     st.stop()
-
-# Debug nếu cần
-# st.write("🔍 Các cột có trong MongoDB:", df.columns.tolist())
 
 df["symbol"] = df["symbol"].str.upper()
 
-# Bảng dữ liệu đầy đủ
-st.markdown("### 📊 Full Prediction Table")
+# Giới hạn ngoại lai
+clip_cols = ["predicted_price", "last_price", "volume", "volatility"]
+for c in clip_cols:
+    if c in df.columns:
+        df[c] = np.clip(df[c], 0, np.percentile(df[c], 95))
+
+st.markdown("### Full Prediction Dataset")
 st.dataframe(df.set_index("symbol"), use_container_width=True)
 
-# Giới hạn scale để dễ đọc
-df_limited = df.copy()
-df_limited["predicted_price_capped"] = df_limited["predicted_price"].apply(lambda x: min(x, 5000))
-df_limited["rmse_capped"] = df_limited["rmse"].apply(lambda x: min(x, 100))
-
-# Biểu đồ cột
+# ===== Biểu đồ cơ bản =====
 col1, col2 = st.columns(2)
-
 with col1:
-    st.markdown("### 📈 Predicted Price (Capped)")
-    fig1 = px.bar(df_limited, x="symbol", y="predicted_price_capped", color="symbol", text="predicted_price")
+    st.markdown("### Predicted vs Last Price")
+    fig1 = px.bar(df, x="symbol", y=["predicted_price", "last_price"], barmode="group", text_auto=True)
     st.plotly_chart(fig1, use_container_width=True)
 
 with col2:
-    st.markdown("### 🎯 Model RMSE (Capped)")
-    fig2 = px.bar(df_limited, x="symbol", y="rmse_capped", color="symbol", text="rmse")
+    st.markdown("### Model RMSE")
+    fig2 = px.bar(df, x="symbol", y="rmse", color="symbol", text="rmse")
     st.plotly_chart(fig2, use_container_width=True)
 
-# Scatter plot
-st.markdown("### 🔬 Scatter Plot: Predicted Price vs RMSE")
-fig3 = px.scatter(df, x="predicted_price", y="rmse", color="symbol", hover_name="symbol")
-st.plotly_chart(fig3, use_container_width=True)
+# ===== Khám phá đặc trưng =====
+st.markdown("### Feature Exploration")
+tabs = st.tabs(["Scatter", "Boxplot", "Pie", "Correlation", "Histogram", "Price Change"])
 
-# Box plot
-st.markdown("### 📦 Price Distribution (Box Plot)")
-fig4 = px.box(df, y="predicted_price", points="all", color="symbol")
-st.plotly_chart(fig4, use_container_width=True)
+with tabs[0]:
+    fig = px.scatter(df, x="volatility", y="predicted_price", color="symbol",
+                     size="volume", hover_data=[
+                         "ma_6h", "ma_24h", "ma_72h", 
+                         "price_change_pct", "volume_change_pct",
+                         "high_low_ratio", "high_close_diff", "low_close_diff"
+                     ])
+    st.plotly_chart(fig, use_container_width=True)
 
-# Pie chart (chỉ nếu có volume)
-if "volume" in df.columns:
-    st.markdown("### 🍰 Volume Distribution (Pie Chart)")
-    fig5 = px.pie(df, names="symbol", values="volume", title="Crypto Volume Share")
-    st.plotly_chart(fig5, use_container_width=True)
+with tabs[1]:
+    box_features = ["open", "high", "low", "ma_6h", "ma_24h", "ma_72h", "predicted_price"]
+    fig = px.box(df, y=box_features, points="all", color="symbol")
+    st.plotly_chart(fig, use_container_width=True)
 
-# Dự đoán vs thực tế (nếu có)
-if "last_price" in df.columns:
-    st.markdown("### 📉 Predicted vs Last Price (Line Chart)")
-    fig6 = px.line(
-        df.melt(id_vars=["symbol"], value_vars=["last_price", "predicted_price"]),
-        x="symbol", y="value", color="variable", markers=True
-    )
-    st.plotly_chart(fig6, use_container_width=True)
+with tabs[2]:
+    fig = px.pie(df, names="symbol", values="volume", title="Volume Share per Coin")
+    st.plotly_chart(fig, use_container_width=True)
+
+with tabs[3]:
+    corr = df.select_dtypes("number").corr()
+    fig = px.imshow(corr, text_auto=True, color_continuous_scale="Blues", title="Feature Correlation Heatmap")
+    st.plotly_chart(fig, use_container_width=True)
+
+with tabs[4]:
+    fig = px.histogram(df, x="volatility", color="symbol", nbins=25)
+    st.plotly_chart(fig, use_container_width=True)
+
+with tabs[5]:
+    fig = px.bar(df, x="symbol", y="price_change_pct", color="symbol", text="price_change_pct")
+    st.plotly_chart(fig, use_container_width=True)
