@@ -11,6 +11,8 @@ const attrs = [
 
 const cards = {};
 
+const previousData = {};
+
 function createCard(symbol) {
   const card = document.createElement("div");
   card.className = "crypto-card";
@@ -25,7 +27,8 @@ function createCard(symbol) {
   attrs.forEach(attr => {
     const p = document.createElement("p");
     p.id = `${symbol}_${attr}`;
-    p.textContent = `${attr.replace("data_", "").replace(/_/g, " ")}: ?`;
+    const label = attr.replace("data_", "").replace(/_/g, " ");
+    p.innerHTML = `${label}: <span class="value">?</span>`;
     details.appendChild(p);
   });
   card.appendChild(details);
@@ -33,14 +36,24 @@ function createCard(symbol) {
   const pred = document.createElement("div");
   pred.className = "prediction";
   pred.id = `${symbol}_prediction`;
-  pred.textContent = `Dự đoán (next): ?`;
+  pred.innerHTML = `Dự đoán (next): <span class="value">?</span>`;
   card.appendChild(pred);
 
   document.getElementById("crypto-container").appendChild(card);
   cards[symbol] = card;
 }
 
-// Hàm cập nhật dữ liệu thực tế (2s/lần)
+function updateColor(element, newValue, oldValue) {
+  if (element && !isNaN(newValue) && oldValue !== undefined && !isNaN(oldValue)) {
+    element.classList.remove("price-up", "price-down");
+    if (newValue > oldValue) {
+      element.classList.add("price-up");
+    } else if (newValue < oldValue) {
+      element.classList.add("price-down");
+    }
+  }
+}
+
 async function updateLive(symbol) {
   try {
     const res = await fetch(`/api/crypto/${symbol}`);
@@ -48,9 +61,23 @@ async function updateLive(symbol) {
     const latest = Array.isArray(data) ? data.at(-1) : null;
 
     if (latest) {
+      if (!previousData[symbol]) {
+        previousData[symbol] = {};
+      }
+
       attrs.forEach(attr => {
-        const el = document.getElementById(`${symbol}_${attr}`);
-        if (el) el.textContent = `${attr.replace("data_", "").replace(/_/g, " ")}: ${latest[attr]}`;
+        const p_element = document.getElementById(`${symbol}_${attr}`);
+        const value_span = p_element ? p_element.querySelector('.value') : null;
+
+        if (value_span) {
+          const newValue = parseFloat(latest[attr]);
+          const oldValue = previousData[symbol][attr];
+
+          updateColor(value_span, newValue, oldValue);
+
+          value_span.textContent = newValue;
+          previousData[symbol][attr] = newValue;
+        }
       });
     }
   } catch (err) {
@@ -58,15 +85,23 @@ async function updateLive(symbol) {
   }
 }
 
-// Hàm cập nhật dự đoán (10s/lần)
 async function updatePrediction(symbol) {
   try {
     const res = await fetch(`/api/crypto/predictions/${symbol}`);
     const pred = await res.json();
-    const predEl = document.getElementById(`${symbol}_prediction`);
+    const predElContainer = document.getElementById(`${symbol}_prediction`);
+    const value_span = predElContainer ? predElContainer.querySelector('.value') : null;
 
-    if (predEl && pred && pred.predicted_price !== undefined) {
-      predEl.textContent = `Dự đoán (next): ${pred.predicted_price}`;
+    if (value_span && pred && pred.predicted_price !== undefined) {
+      const newPredValue = parseFloat(pred.predicted_price);
+      const oldPredValue = previousData[symbol] ? previousData[symbol].prediction : undefined;
+
+      updateColor(value_span, newPredValue, oldPredValue);
+
+      value_span.textContent = newPredValue;
+
+      if (!previousData[symbol]) previousData[symbol] = {};
+      previousData[symbol].prediction = newPredValue;
     }
   } catch (err) {
     console.error(`Prediction update error for ${symbol}:`, err);

@@ -45,3 +45,20 @@ h1 {
   font-weight: bold;
   color: green;
 }
+
+.price-up {
+  color: #28a745 !important;
+  font-weight: bold;
+  transition: color 0.3s ease-in-out;
+}
+
+.price-down {
+  color: #dc3545 !important;
+  font-weight: bold;
+  transition: color 0.3s ease-in-out;
+}
+
+.value {
+  display: inline-block;
+  min-width: 50px;
+}
