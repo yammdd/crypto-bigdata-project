@@ -39,6 +39,8 @@ services:
       - ./models:/opt/spark/work-dir/models
     environment:
       - PYTHONPATH=/opt/spark/work-dir
+      - GOOGLE_AI_API_KEY=${GOOGLE_AI_API_KEY}
+      - NEWS_API_KEY=${NEWS_API_KEY}
     command: ["/opt/spark/bin/spark-submit", "/opt/spark/work-dir/streaming/spark_streaming.py"]
 
   spark-worker:
@@ -51,6 +53,9 @@ services:
     command: ["/opt/spark/bin/spark-class", "org.apache.spark.deploy.worker.Worker", "spark://spark-master:7077"]
     ports:
       - "8081:8081"
+    environment:  
+      - GOOGLE_AI_API_KEY=${GOOGLE_AI_API_KEY}
+      - NEWS_API_KEY=${NEWS_API_KEY}
     volumes:
       - ./streaming:/opt/spark/work-dir/streaming
 

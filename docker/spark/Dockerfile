@@ -30,8 +30,7 @@ ENV SPARK_VERSION=3.4.1
 RUN wget https://repo1.maven.org/maven2/ml/dmlc/xgboost4j-spark_${SCALA_VERSION}/${XGBOOST_VERSION}/xgboost4j-spark_${SCALA_VERSION}-${XGBOOST_VERSION}.jar -P /opt/spark/jars/ && \
     wget https://repo1.maven.org/maven2/ml/dmlc/xgboost4j_${SCALA_VERSION}/${XGBOOST_VERSION}/xgboost4j_${SCALA_VERSION}-${XGBOOST_VERSION}.jar -P /opt/spark/jars/
 
-RUN pip3 install happybase thrift yfinance xgboost pandas numpy scikit-learn joblib pymongo streamlit plotly matplotlib python-dateutil
-
+RUN pip3 install happybase thrift yfinance xgboost pandas numpy scikit-learn joblib pymongo streamlit plotly matplotlib python-dateutil pyspark google-generativeai newsapi-python
 WORKDIR /opt/spark/work-dir
 
 COPY ../../streaming /opt/spark/work-dir/streaming
