@@ -3,3 +3,7 @@ happybase
 xgboost
 numpy
 joblib
+google-generativeai
+newsapi-python
+pymongo
+pandas

@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 try:
     genai.configure(api_key=os.environ.get("GOOGLE_AI_API_KEY"))
     newsapi = NewsApiClient(api_key=os.environ.get("NEWS_API_KEY"))
-    model = genai.GenerativeModel("gemini-2.5-pro")
+    model = genai.GenerativeModel("gemini-2.5-flash-lite")
 except (TypeError, ValueError) as e:
     print(f"CẢNH BÁO: Không thể cấu hình API. Vui lòng kiểm tra biến môi trường GOOGLE_AI_API_KEY và NEWS_API_KEY. Lỗi: {e}")
     model = None

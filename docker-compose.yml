@@ -118,8 +118,11 @@ services:
     environment:
       - HBASE_THRIFT_HOST=hbase
       - HBASE_THRIFT_PORT=9090
+      - GOOGLE_AI_API_KEY=${GOOGLE_AI_API_KEY}
+      - MONGO_HOST=mongodb
     depends_on:
       - hbase
+      - mongodb
       
   streamlit:
     build:

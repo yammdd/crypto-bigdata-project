@@ -1,8 +1,9 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import from_json, col, avg, max, min, collect_set, round
+from pyspark.sql.functions import from_json, col
 from pyspark.sql.types import StructType, StringType, FloatType, LongType
 from streaming.utils.hbase_writer import write_to_hbase
 from streaming.utils.market_analyzer import get_latest_crypto_news, get_market_analysis
+from streaming.utils.context_writer import update_market_context
 
 def process_batch_and_analyze(df, epoch_id):
     if df.isEmpty():
@@ -47,6 +48,24 @@ def process_batch_and_analyze(df, epoch_id):
     
     df.unpersist()
 
+def process_and_save_context(df, epoch_id):
+    if df.isEmpty():
+        return
+
+    print(f"\n--- Xử lý Batch ID: {epoch_id} để cập nhật bối cảnh chi tiết ---")
+    df.cache()
+
+    batch_data_list = [row.asDict() for row in df.collect()]
+    
+    latest_news = get_latest_crypto_news()
+    news_summary = "\n".join(latest_news)
+    
+    update_market_context(news_summary, batch_data_list)
+    
+    write_to_hbase(df, epoch_id)
+    
+    df.unpersist()
+    print(f"--- Hoàn thành xử lý Batch ID: {epoch_id} ---")
 
 spark = SparkSession.builder \
     .appName("CryptoPriceStream") \
@@ -81,7 +100,7 @@ df_parsed = df_raw.selectExpr("CAST(value AS STRING) as json") \
 
 query = df_parsed.writeStream \
     .outputMode("append") \
-    .foreachBatch(process_batch_and_analyze) \
+    .foreachBatch(process_and_save_context) \
     .start()
 
 query.awaitTermination()

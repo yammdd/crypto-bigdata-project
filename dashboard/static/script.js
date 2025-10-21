@@ -120,3 +120,89 @@ function main() {
 }
 
 main();
+
+document.addEventListener('DOMContentLoaded', (event) => {
+  const chatForm = document.getElementById('chat-form');
+  const userInput = document.getElementById('user-input');
+  const chatMessages = document.getElementById('chat-messages');
+  const chatContainer = document.querySelector('.chat-container');
+  const toggleChatBtn = document.getElementById('toggle-chat-btn');
+
+  if (!chatForm || !userInput || !chatMessages) {
+    console.error("Không tìm thấy các phần tử của Chatbot. Hãy kiểm tra lại HTML.");
+    return;
+  }
+  toggleChatBtn.addEventListener('click', () => {
+    chatContainer.classList.toggle('minimized');
+
+    if (chatContainer.classList.contains('minimized')) {
+      toggleChatBtn.textContent = '+';
+    } else {
+      toggleChatBtn.textContent = '-';
+    }
+  });
+
+function addMessage(text, sender) {
+  const loading = document.querySelector('.loading-message');
+  if (loading) {
+    loading.remove();
+  }
+
+  const messageElement = document.createElement('div');
+  messageElement.classList.add('message', `${sender}-message`);
+  
+  const p = document.createElement('p');
+  p.innerHTML = text;
+  messageElement.appendChild(p);
+
+  chatMessages.appendChild(messageElement);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+function showLoadingIndicator() {
+  const loadingElement = document.createElement('div');
+  loadingElement.classList.add('message', 'bot-message', 'loading-message');
+  
+  const flashingDot = document.createElement('div');
+  flashingDot.classList.add('dot-flashing');
+  loadingElement.appendChild(flashingDot);
+
+  chatMessages.appendChild(loadingElement);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+chatForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const userText = userInput.value.trim();
+
+    if (userText) {
+      addMessage(userText, 'user');
+      userInput.value = '';
+      showLoadingIndicator();
+
+      try {
+        const res = await fetch('/api/chatbot/ask', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ question: userText }),
+        });
+
+        const data = await res.json();
+        
+        let botResponse = '';
+        if (data.answer) {
+          botResponse = data.answer.replace(/\n/g, '<br>');
+        } else {
+          botResponse = data.error || "Sorry, I couldn't get a response.";
+        }
+        addMessage(botResponse, 'bot');
+
+      } catch (error) {
+        console.error('Error contacting chatbot API:', error);
+        addMessage("Sorry, I'm having trouble connecting. Please try again later.", 'bot');
+      }
+    }
+  });
+});
