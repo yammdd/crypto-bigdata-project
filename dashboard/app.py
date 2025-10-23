@@ -7,9 +7,10 @@ import traceback
 import xgboost as xgb
 import numpy as np
 import joblib
-from pymongo import MongoClient
 import google.generativeai as genai
 import pandas as pd
+from datetime import datetime, timedelta
+from newsapi import NewsApiClient
 
 app = Flask(__name__)
 
@@ -19,6 +20,12 @@ try:
 except Exception as e:
     print(f"CẢNH BÁO: Không thể cấu hình Gemini. Lỗi: {e}")
     model = None
+
+try:
+    newsapi = NewsApiClient(api_key=os.getenv("NEWS_API_KEY"))
+except Exception as e:
+    print(f"CẢNH BÁO: Không thể cấu hình NewsAPI. Lỗi: {e}")
+    newsapi = None
 
 CONTEXT_DOCUMENT_ID = "latest_market_context"
 
@@ -67,6 +74,39 @@ def get_historical_data_from_hbase(symbol, limit=200):
     except Exception as e:
         print(f"Lỗi khi lấy dữ liệu HBase: {e}")
         return None
+
+def get_latest_crypto_news(query="crypto OR bitcoin OR ethereum", days=1, page_size=5): # Giảm xuống 5 tin để prompt gọn hơn
+    if not newsapi:
+        return {
+            "summary": "News service is not configured.",
+            "sources_markdown": ""
+        }
+    try:
+        from_date = (datetime.utcnow() - timedelta(days=days)).strftime("%Y-%m-%d")
+        response = newsapi.get_everything(
+            q=query, from_param=from_date, sort_by="relevancy", language="en", page_size=page_size
+        )
+        
+        summary_lines = []
+        sources_markdown = []
+        
+        for article in response.get("articles", []):
+            title = article.get('title', 'No Title')
+            url = article.get('url', '#')
+            # Tóm tắt chỉ chứa tiêu đề cho ngắn gọn
+            summary_lines.append(f"- {title}")
+            # Nguồn chứa cả tiêu đề và link dạng Markdown
+            sources_markdown.append(f"- [{title}]({url})")
+            
+        return {
+            "summary": "\n".join(summary_lines),
+            "sources_markdown": "\n".join(sources_markdown)
+        }
+    except Exception as e:
+        return {
+            "summary": f"Error fetching news: {e}",
+            "sources_markdown": ""
+        }
 
 def calculate_rsi(df, period=14):
     delta = df['close'].diff()
@@ -198,66 +238,79 @@ def ask_chatbot():
     if not user_question:
         return jsonify({"error": "Question is required."}), 400
 
-    # Lấy bối cảnh chung từ MongoDB
+    # LẤY BỐI CẢNH TIN TỨC TRỰC TIẾP
+    news_context = get_latest_crypto_news()
+    news_summary = news_context.get("summary")
+    sources_list_markdown = news_context.get("sources_markdown")
+
+    # XÂY DỰNG BẢN TÓM TẮT THỊ TRƯỜNG TỔNG QUAN TỪ HBASE
+    all_symbols = ["btcusdt", "ethusdt", "bnbusdt", "solusdt", "xrpusdt", "adausdt", "dogeusdt", "linkusdt", "dotusdt", "ltcusdt"]
+    market_snapshot_data = []
     try:
-        client = MongoClient(os.getenv("MONGO_HOST", "mongodb"), 27017)
-        db = client['crypto_db']
-        collection = db['market_context']
-        context = collection.find_one({"_id": CONTEXT_DOCUMENT_ID})
-        client.close()
-    except Exception as e:
-        return jsonify({"error": f"Could not connect to context database: {e}"}), 500
+        connection = happybase.Connection(host=os.getenv("HBASE_THRIFT_HOST", "hbase"), port=int(os.getenv("HBASE_THRIFT_PORT", "9090")))
+        connection.open()
+        table = connection.table("crypto_prices")
         
-    if not context or not context.get('real_time_data'):
-        return jsonify({"answer": "I don't have enough market context yet. Please wait a moment and try again."})
+        for symbol in all_symbols:
+            row_prefix = f"{symbol.lower()}_".encode("utf-8")
+            latest_row = next(table.scan(row_prefix=row_prefix, reversed=True, limit=1), None)
+            if latest_row:
+                key, data = latest_row
+                price = float(data.get(b'data:price', b'0'))
+                change_pct = float(data.get(b'data:price_change_pct', b'0'))
+                market_snapshot_data.append(f"- **{symbol.upper()}**: Price=${price:.4f}, 24h Change={change_pct:.2f}%")
 
-    # Định dạng bối cảnh chung
-    formatted_data_summary = "Here is the latest data for each symbol:\n"
-    all_symbols = []
-    for item in context.get('real_time_data', []):
-        symbol = item.get('symbol', 'N/A').upper()
-        all_symbols.append(symbol)
-        price = item.get('price', 0)
-        change_pct = item.get('price_change_pct', 0)
-        formatted_data_summary += f"- **{symbol}**: Price=${price:.4f}, 24h Change={change_pct:.2f}%\n"
+        connection.close()
+        formatted_data_summary = "\n".join(market_snapshot_data)
+        if not formatted_data_summary:
+            formatted_data_summary = "Could not retrieve market snapshot from HBase."
+            
+    except Exception as e:
+        formatted_data_summary = f"Error retrieving market snapshot: {e}"
 
-    # Phân tích câu hỏi của người dùng để tìm symbol
+
+    # Phân tích câu hỏi của người dùng để tìm symbol mục tiêu
     target_symbol = None
-    for s in all_symbols:
-        if s.replace("USDT", "") in user_question.upper():
-            target_symbol = s.replace("USDT", "").lower() + "usdt"
+    for s_with_usdt in all_symbols:
+        s_without_usdt = s_with_usdt.replace("usdt", "")
+        if s_without_usdt.upper() in user_question.upper():
+            target_symbol = s_with_usdt
             break
             
-    # Lấy dữ liệu lịch sử và tính chỉ báo
-    technical_analysis_summary = "No specific technical analysis performed."
+    # Nếu có symbol, thực hiện phân tích kỹ thuật
+    technical_analysis_summary = "No specific coin mentioned for technical analysis."
     if target_symbol:
         df_history = get_historical_data_from_hbase(target_symbol, limit=50)
-        if df_history is not None and not df_history.empty and len(df_history) > 14:
+        if df_history is not None and not df_history.empty and len(df_history) > 20:
             df_history['RSI_14'] = calculate_rsi(df_history, period=14)
             df_history['SMA_20'] = df_history['close'].rolling(window=20).mean()
             
             latest_indicators = df_history.iloc[-1]
-            current_price = latest_indicators['close']
-            rsi_14 = latest_indicators.get('RSI_14')
-            sma_20 = latest_indicators.get('SMA_20')
-            
-            technical_analysis_summary = f"""
+            if not pd.isna(latest_indicators.get('RSI_14')) and not pd.isna(latest_indicators.get('SMA_20')):
+                current_price = latest_indicators['close']
+                rsi_14 = latest_indicators.get('RSI_14')
+                sma_20 = latest_indicators.get('SMA_20')
+                
+                technical_analysis_summary = f"""
 **Technical Analysis for {target_symbol.upper()}:**
 - **Current Price:** ${current_price:.4f}
 - **RSI (14 periods):** {rsi_14:.2f} (A value > 70 suggests overbought, < 30 suggests oversold).
 - **Simple Moving Average (20 periods):** ${sma_20:.4f} (If price is above SMA, it's a bullish signal; if below, it's bearish).
-- **Recent High:** ${df_history['high'].max():.4f} (Potential resistance level).
-- **Recent Low:** ${df_history['low'].min():.4f} (Potential support level).
+- **Recent High (Resistance):** ${df_history['high'].max():.4f}
+- **Recent Low (Support):** ${df_history['low'].min():.4f}
 """
 
+    # Tạo Prompt cho Gemini
     prompt = f"""
     You are an expert crypto market analyst. Your analysis must be technical and data-driven.
-    Based on the following real-time market context, news, and specific technical indicators, answer the user's question.
+    Based on the following news, overall market snapshot, and specific technical indicators (if available), answer the user's question.
     Present the data and analysis objectively and finally may give direct financial advice (e.g., "you should buy/sell") if justified by the data.
+    When you use information from a news article, you MUST end the sentence with a citation that includes the article's title in markdown link format, like this: "This happened recently [cite: Title of The Article](url_to_article).".
+    Answer in the same language as the user's question
 
     --- General Market Context ---
     **Recent News:**
-    {context.get('news_summary', 'No news available.')}
+    {news_summary}
 
     **Overall Market Snapshot:**
     {formatted_data_summary}
@@ -267,16 +320,23 @@ def ask_chatbot():
     {technical_analysis_summary}
     --- End of Specific Analysis ---
 
+    --- Available News Sources (for citation) ---
+    {sources_list_markdown}
+    --- End of Sources ---
+
     **User's Question:** {user_question}
 
     **Your Expert Answer:**
     """
-    # Gửi prompt đến mô hình Gemini
+
+    # 6. Gọi Gemini API và trả lời
     try:
         response = model.generate_content(prompt)
         return jsonify({"answer": response.text})
     except Exception as e:
+        print(f"Lỗi khi gọi Gemini API: {e}")
         return jsonify({"error": f"Error generating response from AI: {e}"}), 500
+
 
 @app.route("/static/<path:filename>")
 def serve_static(filename):
