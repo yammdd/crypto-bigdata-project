@@ -109,12 +109,21 @@ def get_latest_crypto_news(query="crypto OR bitcoin OR ethereum", days=1, page_s
         }
 
 def calculate_rsi(df, period=14):
-    delta = df['close'].diff()
-    gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
-    loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
 
-    rs = gain / loss
+    delta = df['close'].diff()
+
+    gain = delta.where(delta > 0, 0)
+    loss = -delta.where(delta < 0, 0)
+
+    avg_gain = gain.rolling(window=period, min_periods=1).mean()
+    avg_loss = loss.rolling(window=period, min_periods=1).mean()
+
+    avg_gain = gain.ewm(com=period - 1, adjust=False).mean()
+    avg_loss = loss.ewm(com=period - 1, adjust=False).mean()
+    rs = avg_gain / (avg_loss + 1e-9)
+
     rsi = 100 - (100 / (1 + rs))
+    
     return rsi
 
 
@@ -306,8 +315,8 @@ def ask_chatbot():
     Based on the following news, overall market snapshot, and specific technical indicators (if available), answer the user's question.
     Present the data and analysis objectively and finally may give direct financial advice (e.g., "you should buy/sell") if justified by the data.
     When you use information from a news article, you MUST end the sentence with a citation that includes the article's title in markdown link format, like this: "This happened recently [cite: Title of The Article](url_to_article).".
-    Answer in the same language as the user's question
-
+    Answer in the same language as the user's question.
+    
     --- General Market Context ---
     **Recent News:**
     {news_summary}
