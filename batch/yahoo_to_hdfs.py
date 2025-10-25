@@ -23,7 +23,7 @@ symbol_map = {
 output_dir = "hdfs://namenode:9000/crypto/yahoo"
 
 end_date = datetime.now()
-start_date = end_date - timedelta(days=365*2)
+start_date = end_date - timedelta(days=365*8)  # 8 years of data
 
 # Initialize Spark
 spark = SparkSession.builder.appName("YahooFinanceBatch").getOrCreate()
@@ -43,7 +43,7 @@ for symbol_binance, symbol_yahoo in symbol_map.items():
                 symbol_yahoo,
                 start=start,
                 end=end,
-                interval="1h",
+                interval="1d",  # Daily intervals for long-term analysis
                 progress=False,
             )
             if df.empty:
@@ -65,6 +65,13 @@ for symbol_binance, symbol_yahoo in symbol_map.items():
     # Combine all monthly data
     all_df = pd.concat(monthly_dfs)
     all_df.columns = [c[0].lower().replace(' ', '_') if isinstance(c, tuple) else c.lower().replace(' ', '_') for c in all_df.columns]
+    
+    # Rename 'date' column to 'datetime' for consistency
+    if 'date' in all_df.columns:
+        all_df = all_df.rename(columns={'date': 'datetime'})
+    
+    # Ensure datetime column is properly formatted
+    all_df['datetime'] = pd.to_datetime(all_df['datetime'])
 
     sdf = spark.createDataFrame(all_df)
     save_path = f"hdfs://hdfs-namenode:8020/crypto/yahoo/{symbol_binance.lower()}"
