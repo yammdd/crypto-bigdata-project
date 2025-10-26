@@ -23,7 +23,7 @@ symbol_map = {
 output_dir = "hdfs://namenode:9000/crypto/yahoo"
 
 end_date = datetime.now()
-start_date = end_date - timedelta(days=365*8)  # 8 years of data
+start_date = end_date - timedelta(days=365*2)  
 
 # Initialize Spark
 spark = SparkSession.builder.appName("YahooFinanceBatch").getOrCreate()

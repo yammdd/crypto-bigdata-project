@@ -196,10 +196,10 @@ if volatility_filter != "All":
         df = df[df["volatility_ratio"] > 0.15]
 
 # Outlier clipping for better visualization
-clip_cols = ["predicted_price", "last_price", "volume", "volatility_7d", "volatility_14d", "volatility_30d"]
-for c in clip_cols:
-    if c in df.columns:
-        df[c] = np.clip(df[c], 0, np.percentile(df[c], 95))
+# clip_cols = ["volume", "volatility_7d", "volatility_14d", "volatility_30d"]
+# for c in clip_cols:
+#     if c in df.columns:
+#         df[c] = np.clip(df[c], 0, np.percentile(df[c], 95))
 
 # Debug: Print available columns
 st.sidebar.markdown("---")
