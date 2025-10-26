@@ -132,7 +132,9 @@ document.addEventListener('DOMContentLoaded', (event) => {
     console.error("Một hoặc nhiều phần tử của Chatbot không được tìm thấy. Vui lòng kiểm tra lại file HTML.");
     return;
   }
-
+  chatContainer.classList.add('minimized');
+  toggleChatBtn.textContent = '';
+  
   toggleChatBtn.addEventListener('click', () => {
   chatContainer.classList.toggle('minimized');
 
