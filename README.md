@@ -1,54 +1,44 @@
-clone về xong vào thư mục
+### Clone the Project
+
+Open the folder `crypto-bigdata-project`:
 
 ```bash
 cd crypto-bigdata-project
 ```
 
-xong, tạo 1 thư mục `crypto-bigdata-project/models` để ko bị lỗi
+Create a folder named `models`:
+
+```
+crypto-bigdata-project/models
+```
+
+Build and start the Docker containers:
+
 ```bash
 docker compose up -d --build
 ```
 
-tại thư mục `crypto-bigdata-project`
+After that, access the Spark master container:
 
-chạy
 ```bash
 docker exec -it spark-master bash
 ```
 
-xong 
+Set the Spark path:
+
 ```bash
 export PATH=$PATH:/opt/spark/bin
 ```
 
-rồi 
-```bash
-spark-submit /opt/spark/work-dir/batch/yahoo_to_hdfs.py
-```
-
-đợi 1 lúc cho nó chạy xong, rồi chạy tiếp cái này
+Then run the following commands sequentially:
 
 ```bash
-spark-submit /opt/spark/work-dir/batch/train_all_xgboost_models.py
-```
-
-rồi lại (phần batch, nếu mà sửa UI thì ko cần chạy cũng dc)
-```bash
+spark-submit /opt/spark/work-dir/batch/data_pipeline_1h.py
+spark-submit /opt/spark/work-dir/batch/data_pipeline_1d.py
 spark-submit /opt/spark/work-dir/batch/write_to_mongo.py
 ```
 
-**Lưu ý:** Chỉ chạy các lệnh này 1 lần duy nhất, các lần sau chỉ cần
+**Note:** Run these commands only once periodically (e.g., every few hours or daily) to update the model and batch layer data.
 
-```bash
-docker compose up -d --build
-```
-
-vào frontend trên 
-`localhost:5000`
-
-batch layer trên
-`localhost:8501` (cái này vẫn còn lỗi, tính sau)
-
-hi vọng là chạy được trên máy ae hihihi
-
-có thể sửa các loại coin ae thích, cần thay đổi tên ở tất cả các file liên quan (**rất quan trọng**) rồi chạy lại theo từng bước, dm có khi phải đổi btc sang cái khác chứ nó làm xấu chart của t
+* **Stream layer:** [http://localhost:5000](http://localhost:5000)
+* **Batch layer:** [http://localhost:8501](http://localhost:8501)
