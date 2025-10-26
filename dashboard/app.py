@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, send_from_directory, render_template, request
+from flask import Flask, jsonify, send_from_directory, render_template, request, session
 import happybase
 import os
 import json
@@ -13,8 +13,14 @@ from datetime import datetime, timedelta
 from newsapi import NewsApiClient
 import requests
 import trafilatura
+import uuid
 
 app = Flask(__name__)
+app.secret_key = os.getenv("FLASK_SECRET_KEY", "your-secret-key-change-this")
+
+# Global chat history storage
+# Structure: {session_id: [{"timestamp": datetime, "question": str, "answer": str}, ...]}
+chat_history = {}
 
 try:
     genai.configure(api_key=os.getenv("GOOGLE_AI_API_KEY"))
@@ -30,6 +36,148 @@ except Exception as e:
     newsapi = None
 
 CONTEXT_DOCUMENT_ID = "latest_market_context"
+
+
+def get_or_create_session_id():
+    """Get or create a session ID for the current user"""
+    if 'session_id' not in session:
+        session['session_id'] = str(uuid.uuid4())
+    return session['session_id']
+
+
+def add_to_chat_history(session_id, question, answer):
+    """Add a question-answer pair to the chat history"""
+    if session_id not in chat_history:
+        chat_history[session_id] = []
+    
+    chat_history[session_id].append({
+        "timestamp": datetime.now().isoformat(),
+        "question": question,
+        "answer": answer
+    })
+    
+    # Keep only the last 10 conversations to prevent memory bloat
+    if len(chat_history[session_id]) > 10:
+        chat_history[session_id] = chat_history[session_id][-10:]
+
+
+def get_chat_history_summary(session_id):
+    """Get a formatted summary of recent chat history"""
+    if session_id not in chat_history or not chat_history[session_id]:
+        return "No previous conversation history."
+    
+    history = chat_history[session_id]
+    summary_parts = []
+    
+    for i, entry in enumerate(history[-5:], 1):  # Last 5 conversations
+        summary_parts.append(f"Q{i}: {entry['question']}")
+        summary_parts.append(f"A{i}: {entry['answer'][:200]}...")  # Truncate long answers
+    
+    return "\n".join(summary_parts)
+
+
+def is_greeting(question):
+    """Check if the question is a simple greeting"""
+    greeting_words = [
+        "hello", "hi", "hey", "good morning", "good afternoon", "good evening",
+        "greetings", "howdy", "what's up", "how are you", "how do you do"
+    ]
+    
+    question_lower = question.lower().strip()
+    
+    # Check for exact matches or questions that are just greetings
+    for greeting in greeting_words:
+        if question_lower == greeting or question_lower.startswith(greeting + " "):
+            return True
+    
+    # Check for greeting + "who are you" patterns
+    if any(greeting in question_lower for greeting in greeting_words) and "who are you" in question_lower:
+        return True
+        
+    return False
+
+
+def is_crypto_related(question):
+    """Check if the question is related to cryptocurrency or trading"""
+    crypto_keywords = [
+        # Cryptocurrency names
+        "bitcoin", "btc", "ethereum", "eth", "binance", "bnb", "solana", "sol",
+        "ripple", "xrp", "cardano", "ada", "dogecoin", "doge", "chainlink", "link",
+        "polkadot", "dot", "litecoin", "ltc", "usdt", "usdc", "tether",
+        
+        # Trading terms
+        "crypto", "cryptocurrency", "trading", "buy", "sell", "price", "market",
+        "bullish", "bearish", "pump", "dump", "hodl", "moon", "lambo",
+        "altcoin", "defi", "nft", "blockchain", "mining", "wallet", "exchange",
+        
+        # Financial terms in crypto context
+        "portfolio", "investment", "profit", "loss", "gains", "returns",
+        "volatility", "liquidity", "market cap", "volume", "resistance", "support",
+        
+        # Technical analysis
+        "rsi", "macd", "bollinger", "fibonacci", "candlestick", "chart",
+        "technical analysis", "fundamental analysis", "trend", "breakout"
+    ]
+    
+    question_lower = question.lower()
+    
+    # Check if any crypto keyword is mentioned
+    for keyword in crypto_keywords:
+        if keyword in question_lower:
+            return True
+    
+    # Check for currency symbols and common crypto patterns
+    crypto_patterns = [
+        r'\$[a-z]{3,6}',  # $BTC, $ETH, etc.
+        r'[a-z]{3,6}usdt',  # BTCUSDT, ETHUSDT, etc.
+        r'[a-z]{3,6}/usdt',  # BTC/USDT, ETH/USDT, etc.
+    ]
+    
+    import re
+    for pattern in crypto_patterns:
+        if re.search(pattern, question_lower):
+            return True
+    
+    return False
+
+
+def is_irrelevant_question(question):
+    """Check if the question is completely irrelevant to crypto/trading"""
+    irrelevant_topics = [
+        # Math and science
+        "calculate", "solve", "equation", "formula", "mathematics", "math",
+        "physics", "chemistry", "biology", "science", "experiment", "problem",
+        "2+2", "addition", "subtraction", "multiplication", "division",
+        
+        # Programming
+        "code", "programming", "python", "javascript", "java", "c++", "html", "css",
+        "algorithm", "function", "variable", "debug", "compile", "syntax",
+        "write code", "program", "software", "development",
+        
+        # Literature and arts
+        "poem", "poetry", "novel", "book", "author", "writer", "literature",
+        "art", "painting", "music", "song", "movie", "film", "actor",
+        "shakespeare", "shakespeare", "poetry", "novel", "story",
+        
+        # General knowledge
+        "history", "geography", "politics", "sports", "cooking", "recipe",
+        "travel", "weather", "health", "medicine", "psychology",
+        "pasta", "food", "restaurant", "hotel", "vacation",
+        
+        # Personal questions
+        "your name", "your age", "your favorite", "your opinion on",
+        "what do you think about", "do you like", "are you",
+        "how are you", "what's your", "tell me about yourself"
+    ]
+    
+    question_lower = question.lower()
+    
+    # Check if question contains irrelevant topics
+    has_irrelevant = any(topic in question_lower for topic in irrelevant_topics)
+    
+    # If it has irrelevant topics, it's irrelevant (regardless of crypto context)
+    # This prevents the AI from trying to relate everything back to crypto
+    return has_irrelevant
 
 
 def ensure_table_exists(connection, table_name):
@@ -288,10 +436,51 @@ def ask_chatbot():
     user_question = request.json.get("question")
     if not user_question:
         return jsonify({"error": "Question is required."}), 400
+    
+    # Get or create session ID for this user
+    session_id = get_or_create_session_id()
+    
+    # Get chat history for context
+    chat_history_summary = get_chat_history_summary(session_id)
+    
+    # 1. CHECK FOR SIMPLE GREETINGS
+    if is_greeting(user_question):
+        if "who are you" in user_question.lower():
+            answer = """Hello! I'm a specialized cryptocurrency market analyst AI. I can help you with:
+
+• **Crypto Market Analysis** - Current prices, trends, and market conditions
+• **Technical Analysis** - RSI, moving averages, support/resistance levels
+• **News Analysis** - Latest crypto news and market sentiment
+• **Trading Insights** - Buy/sell recommendations based on data
+• **Portfolio Guidance** - Investment strategies and risk assessment
+
+What would you like to know about the crypto market today?"""
+        else:
+            answer = "Hi! I'm your crypto market analyst. What can I help you with today? I can analyze market trends, provide technical insights, or discuss the latest crypto news."
+        
+        # Store the conversation
+        add_to_chat_history(session_id, user_question, answer)
+        return jsonify({"answer": answer})
+    
+    # 2. CHECK FOR IRRELEVANT QUESTIONS
+    if is_irrelevant_question(user_question):
+        answer = "I'm a specialized cryptocurrency market analyst AI. I can only help with crypto-related questions, market analysis, and trading insights. Please ask me about cryptocurrency markets, trading, or blockchain topics."
+        
+        # Store the conversation
+        add_to_chat_history(session_id, user_question, answer)
+        return jsonify({"answer": answer})
+    
+    # 3. CHECK IF QUESTION IS CRYPTO-RELATED
+    if not is_crypto_related(user_question):
+        answer = "I'm a specialized cryptocurrency market analyst AI. Your question doesn't seem to be related to cryptocurrency, trading, or blockchain topics. I can help you with crypto market analysis, technical indicators, trading strategies, or the latest crypto news. What would you like to know about the crypto market?"
+        
+        # Store the conversation
+        add_to_chat_history(session_id, user_question, answer)
+        return jsonify({"answer": answer})
 
     all_symbols = ["btcusdt", "ethusdt", "bnbusdt", "solusdt", "xrpusdt", "adausdt", "dogeusdt", "linkusdt", "dotusdt", "ltcusdt"]
     
-    # 1. PHÂN TÍCH CÂU HỎI ĐỂ TÌM COIN MỤC TIÊU (ĐƯA LÊN TRƯỚC)
+    # 4. PHÂN TÍCH CÂU HỎI ĐỂ TÌM COIN MỤC TIÊU (CHỈ KHI LÀ CRYPTO-RELATED)
     target_symbol = None
     target_coin_name = None
     
@@ -391,11 +580,12 @@ def ask_chatbot():
         Answer in the same language as the user's question.
 
     ### INSTRUCTIONS ###
-        1.  **Analyze Full Content:** Read through all the full article content provided below. Pay attention to the publication DATE of each article to understand the timeline of events.
-        2.  **Synthesize and Summarize:** Based on this content, synthesize the key market-moving information, trends, and sentiments.
-        3.  **Combine with Data:** Integrate your findings from the news with the provided "Overall Market Snapshot" and "Specific Technical Analysis".
-        4.  **Answer the Question:** Formulate a comprehensive answer to the "User's Question".
-        5.  **Cite Sources:** When you use information from an article, you MUST cite it using a number like `[1]`. At the end of your entire response, create a `### Sources` section and list all the sources corresponding to the numbers, using the provided "Available News Sources". The sources already include the publication date.
+        1.  **Context Awareness:** You have access to the previous conversation history. Use this context to provide more relevant and personalized responses.
+        2.  **Analyze Full Content:** Read through all the full article content provided below. Pay attention to the publication DATE of each article to understand the timeline of events.
+        3.  **Synthesize and Summarize:** Based on this content, synthesize the key market-moving information, trends, and sentiments.
+        4.  **Combine with Data:** Integrate your findings from the news with the provided "Overall Market Snapshot" and "Specific Technical Analysis".
+        5.  **Answer the Question:** Formulate a comprehensive answer to the "User's Question".
+        6.  **Cite Sources:** When you use information from an article, you MUST cite it using a number like `[1]`. At the end of your entire response, create a `### Sources` section and list all the sources corresponding to the numbers, using the provided "Available News Sources". The sources already include the publication date.
         **Example of the final output format:**
         Here is some analysis about the market [1]. Further data suggests another trend [2]. The first point is confirmed by this article again [1].
 
@@ -403,6 +593,10 @@ def ask_chatbot():
         1. [Publication Date][Full Title of Article 1](http://...)
         2. [Publication Date][Full Title of Article 2](http://...)
         ---
+        
+        --- Previous Conversation History ---
+        {chat_history_summary}
+        --- End of Chat History ---
         
         --- Full News Content (for your analysis) ---
         {full_article_content}
@@ -433,10 +627,15 @@ def ask_chatbot():
         Answer in the same language as the user's question.
 
         ### INSTRUCTIONS ###
-        1.  Analyze the "Overall Market Snapshot" and "Specific Technical Analysis" provided below.
-        2.  Formulate a comprehensive answer to the "User's Question" based ONLY on this data.
-        3.  **Crucially, start your response by clearly stating that no specific recent news was found for the query, so the analysis is purely based on technical data.**
+        1.  **Context Awareness:** You have access to the previous conversation history. Use this context to provide more relevant and personalized responses.
+        2.  Analyze the "Overall Market Snapshot" and "Specific Technical Analysis" provided below.
+        3.  Formulate a comprehensive answer to the "User's Question" based ONLY on this data.
+        4.  **Crucially, start your response by clearly stating that no specific recent news was found for the query, so the analysis is purely based on technical data.**
 
+        --- Previous Conversation History ---
+        {chat_history_summary}
+        --- End of Chat History ---
+        
         ---
         ### Overall Market Snapshot
         {formatted_data_summary}
@@ -452,10 +651,37 @@ def ask_chatbot():
     # 6. Gọi Gemini API và trả lời
     try:
         response = model.generate_content(prompt)
-        return jsonify({"answer": response.text})
+        answer = response.text
+        
+        # Store the conversation in chat history
+        add_to_chat_history(session_id, user_question, answer)
+        
+        return jsonify({"answer": answer})
     except Exception as e:
         print(f"Lỗi khi gọi Gemini API: {e}")
         return jsonify({"error": f"Error generating response from AI: {e}"}), 500
+
+
+@app.route("/api/chatbot/history", methods=["GET"])
+def get_chat_history():
+    """Get the chat history for the current session"""
+    session_id = get_or_create_session_id()
+    
+    if session_id not in chat_history:
+        return jsonify({"history": []})
+    
+    return jsonify({"history": chat_history[session_id]})
+
+
+@app.route("/api/chatbot/clear", methods=["POST"])
+def clear_chat_history():
+    """Clear the chat history for the current session"""
+    session_id = get_or_create_session_id()
+    
+    if session_id in chat_history:
+        chat_history[session_id] = []
+    
+    return jsonify({"message": "Chat history cleared successfully"})
 
 
 @app.route("/static/<path:filename>")
@@ -464,7 +690,6 @@ def serve_static(filename):
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
-
 
 
 
