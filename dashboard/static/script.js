@@ -120,3 +120,98 @@ function main() {
 }
 
 main();
+
+document.addEventListener('DOMContentLoaded', (event) => {
+  const chatForm = document.getElementById('chat-form');
+  const userInput = document.getElementById('user-input');
+  const chatMessages = document.getElementById('chat-messages');
+  const chatContainer = document.querySelector('.chat-container');
+  const toggleChatBtn = document.getElementById('toggle-chat-btn');
+
+  if (!chatForm || !userInput || !chatMessages || !chatContainer || !toggleChatBtn) {
+    console.error("Một hoặc nhiều phần tử của Chatbot không được tìm thấy. Vui lòng kiểm tra lại file HTML.");
+    return;
+  }
+
+  toggleChatBtn.addEventListener('click', () => {
+  chatContainer.classList.toggle('minimized');
+
+  if (chatContainer.classList.contains('minimized')) {
+    toggleChatBtn.textContent = '';
+  } else {
+    toggleChatBtn.textContent = '-';
+  }
+})
+
+  // HÀM THÊM TIN NHẮN (KHÔNG THAM CHIẾU LỖI)
+  function addMessage(text, sender) {
+    const loading = document.querySelector('.loading-message');
+    if (loading) {
+      loading.remove();
+    }
+
+    const messageElement = document.createElement('div');
+    messageElement.classList.add('message', `${sender}-message`);
+    
+    if (sender === 'bot') {
+      if (typeof marked !== 'undefined') {
+        messageElement.innerHTML = marked.parse(text);
+      } else {
+        console.error("Thư viện marked.js chưa được tải.");
+        messageElement.textContent = text;
+      }
+    } else {
+      const p = document.createElement('p');
+      p.textContent = text;
+      messageElement.appendChild(p);
+    }
+
+    chatMessages.appendChild(messageElement);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  }
+
+  function showLoadingIndicator() {
+    const loadingElement = document.createElement('div');
+    loadingElement.classList.add('message', 'bot-message', 'loading-message');
+    
+    const flashingDot = document.createElement('div');
+    flashingDot.classList.add('dot-flashing');
+    loadingElement.appendChild(flashingDot);
+
+    chatMessages.appendChild(loadingElement);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  }
+
+  async function handleFormSubmit(e) {
+    e.preventDefault();
+    const userText = userInput.value.trim();
+
+    if (!userText) return;
+
+    addMessage(userText, 'user');
+    userInput.value = '';
+    showLoadingIndicator();
+
+    try {
+      const res = await fetch('/api/chatbot/ask', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question: userText }),
+      });
+
+      if (!res.ok) {
+          throw new Error(`Server responded with status: ${res.status}`);
+      }
+
+      const data = await res.json();
+      const botResponse = data.answer || data.error || "Sorry, I couldn't get a response.";
+      addMessage(botResponse, 'bot');
+
+    } catch (error) {
+      console.error('Lỗi khi giao tiếp với API chatbot:', error);
+      addMessage("Rất tiếc, tôi đang gặp sự cố kết nối. Vui lòng thử lại sau.", 'bot');
+    }
+  }
+
+  chatForm.addEventListener('submit', handleFormSubmit);
+});

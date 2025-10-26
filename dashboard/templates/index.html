@@ -11,5 +11,24 @@
   <h1>Crypto Realtime Dashboard</h1>
   <div id="crypto-container" class="crypto-container"></div>
   <script src="/static/script.js"></script>
+  <div class="chat-container">
+    <div class="chat-header">
+      <h3>AI Market Analyst</h3>
+      <button id="toggle-chat-btn" class="chat-toggle-btn">-</button> 
+    </div>
+    <div class="chat-messages" id="chat-messages">
+      <div class="message bot-message">
+        <p>Hello! Ask me anything about the current crypto market.</p>
+      </div>
+    </div>
+    <div class="chat-input-form">
+      <form id="chat-form">
+        <input type="text" id="user-input" placeholder="Type your question..." autocomplete="off">
+        <button type="submit">Send</button>
+      </form>
+    </div>
+  </div>
+  <script src="/static/script.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </body>
 </html>
