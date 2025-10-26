@@ -36,7 +36,7 @@ function createCard(symbol) {
   const pred = document.createElement("div");
   pred.className = "prediction";
   pred.id = `${symbol}_prediction`;
-  pred.innerHTML = `Dự đoán (next): <span class="value">?</span>`;
+  pred.innerHTML = `Predicted Price: <span class="value">?</span>`;
   card.appendChild(pred);
 
   document.getElementById("crypto-container").appendChild(card);
@@ -114,7 +114,7 @@ function main() {
     updateLive(symbol);
     updatePrediction(symbol);
 
-    setInterval(() => updateLive(symbol), 1500);
+    setInterval(() => updateLive(symbol), 2000);
     setInterval(() => updatePrediction(symbol), 5000);
   });
 }
