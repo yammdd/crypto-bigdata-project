@@ -97,7 +97,7 @@ def is_greeting(question):
     return False
 
 
-def is_crypto_related(question):
+def is_crypto_related(question, chat_history_summary=""):
     """Check if the question is related to cryptocurrency or trading"""
     crypto_keywords = [
         # Cryptocurrency names
@@ -111,7 +111,7 @@ def is_crypto_related(question):
         "altcoin", "defi", "nft", "blockchain", "mining", "wallet", "exchange",
         
         # Financial terms in crypto context
-        "portfolio", "investment", "profit", "loss", "gains", "returns",
+        "portfolio", "profit", "loss", "gains", "returns",
         "volatility", "liquidity", "market cap", "volume", "resistance", "support",
         
         # Technical analysis
@@ -121,7 +121,7 @@ def is_crypto_related(question):
     
     question_lower = question.lower()
     
-    # Check if any crypto keyword is mentioned
+    # Check if any crypto keyword is mentioned in the current question
     for keyword in crypto_keywords:
         if keyword in question_lower:
             return True
@@ -137,6 +137,17 @@ def is_crypto_related(question):
     for pattern in crypto_patterns:
         if re.search(pattern, question_lower):
             return True
+    
+    # Check if the question is a follow-up to a crypto conversation
+    if chat_history_summary and chat_history_summary != "No previous conversation history.":
+        # Look for crypto keywords in recent conversation history
+        history_lower = chat_history_summary.lower()
+        for keyword in crypto_keywords:
+            if keyword in history_lower:
+                # If the current question contains investment-related terms and there's crypto context
+                investment_terms = ["worth", "invest", "investing", "buy", "sell", "should i", "recommend", "advice", "good", "bad", "safe", "risky"]
+                if any(term in question_lower for term in investment_terms):
+                    return True
     
     return False
 
@@ -178,6 +189,38 @@ def is_irrelevant_question(question):
     # If it has irrelevant topics, it's irrelevant (regardless of crypto context)
     # This prevents the AI from trying to relate everything back to crypto
     return has_irrelevant
+
+
+def extract_crypto_from_context(chat_history_summary):
+    """Extract cryptocurrency information from conversation context"""
+    if not chat_history_summary or chat_history_summary == "No previous conversation history.":
+        return None, None
+    
+    all_symbols = ["btcusdt", "ethusdt", "bnbusdt", "solusdt", "xrpusdt", "adausdt", "dogeusdt", "linkusdt", "dotusdt", "ltcusdt"]
+    
+    coin_name_map = {
+        "btc": "bitcoin", "eth": "ethereum", "bnb": "binance coin",
+        "sol": "solana", "xrp": "ripple", "ada": "cardano",
+        "doge": "dogecoin", "link": "chainlink", "dot": "polkadot",
+        "ltc": "litecoin"
+    }
+    
+    history_lower = chat_history_summary.lower()
+    
+    # Look for cryptocurrency mentions in the conversation history
+    for s_with_usdt in all_symbols:
+        s_without_usdt = s_with_usdt.replace("usdt", "")
+        
+        # Check for symbol mentions (BTC, ETH, DOGE, etc.)
+        if s_without_usdt.upper() in history_lower.upper():
+            return s_with_usdt, coin_name_map.get(s_without_usdt, s_without_usdt)
+        
+        # Check for full name mentions (bitcoin, ethereum, dogecoin, etc.)
+        coin_name = coin_name_map.get(s_without_usdt)
+        if coin_name and coin_name in history_lower:
+            return s_with_usdt, coin_name
+    
+    return None, None
 
 
 def ensure_table_exists(connection, table_name):
@@ -470,8 +513,8 @@ What would you like to know about the crypto market today?"""
         add_to_chat_history(session_id, user_question, answer)
         return jsonify({"answer": answer})
     
-    # 3. CHECK IF QUESTION IS CRYPTO-RELATED
-    if not is_crypto_related(user_question):
+    # 3. CHECK IF QUESTION IS CRYPTO-RELATED (with context)
+    if not is_crypto_related(user_question, chat_history_summary):
         answer = "I'm a specialized cryptocurrency market analyst AI. Your question doesn't seem to be related to cryptocurrency, trading, or blockchain topics. I can help you with crypto market analysis, technical indicators, trading strategies, or the latest crypto news. What would you like to know about the crypto market?"
         
         # Store the conversation
@@ -491,6 +534,7 @@ What would you like to know about the crypto market today?"""
         "ltc": "litecoin"
     }
 
+    # First, try to find crypto mentioned in the current question
     for s_with_usdt in all_symbols:
         s_without_usdt = s_with_usdt.replace("usdt", "")
         if s_without_usdt.upper() in user_question.upper() or \
@@ -498,6 +542,14 @@ What would you like to know about the crypto market today?"""
             target_symbol = s_with_usdt
             target_coin_name = coin_name_map.get(s_without_usdt, s_without_usdt)
             break
+    
+    # If no crypto found in current question, try to extract from conversation context
+    if not target_symbol:
+        context_symbol, context_coin_name = extract_crypto_from_context(chat_history_summary)
+        if context_symbol:
+            target_symbol = context_symbol
+            target_coin_name = context_coin_name
+            print(f"[CHATBOT] Using crypto from context: {target_symbol} ({target_coin_name})")
 
     if target_coin_name:
         news_query = f'"{target_coin_name}" OR "{target_symbol.replace("usdt", "").upper()}"'
