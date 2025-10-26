@@ -1,7 +1,4 @@
-# batch/write_to_mongo.py
-
-import os
-import json
+import os, json
 from pymongo import MongoClient
 
 symbols = [
@@ -14,20 +11,18 @@ client = MongoClient(mongo_uri)
 db = client["crypto_batch"]
 collection = db["predictions"]
 
-model_dir = "/opt/spark/work-dir/models"
+base_dir = "/opt/spark/work-dir/models"
 
-for symbol in symbols:
+for sym in symbols:
+    file_path = os.path.join(base_dir, f"xgboost_{sym}_prediction.json")
+    if not os.path.exists(file_path):
+        print(f"[WARN] Missing: {file_path}")
+        continue
     try:
-        local_path = os.path.join(model_dir, f"xgboost_{symbol}_prediction.json")
-        if not os.path.exists(local_path):
-            print(f"[WARN] File not found: {local_path}")
-            continue
-
-        with open(local_path, "r") as f:
+        with open(file_path, "r") as f:
             data = json.load(f)
-            data["_id"] = symbol
-            collection.replace_one({"_id": symbol}, data, upsert=True)
-            print(f"[OK] Inserted prediction for {symbol}")
-
+            data["_id"] = sym
+            collection.replace_one({"_id": sym}, data, upsert=True)
+            print(f"[OK] Updated MongoDB for {sym}")
     except Exception as e:
-        print(f"[ERROR] {symbol}: {e}")
+        print(f"[ERROR] {sym}: {e}")

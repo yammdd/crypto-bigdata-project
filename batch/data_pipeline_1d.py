@@ -1,12 +1,92 @@
+from datetime import datetime, timedelta
+from dateutil.relativedelta import relativedelta
 from pyspark.sql import SparkSession
+import yfinance as yf
+import pandas as pd
+import os
 from pyspark.ml.feature import VectorAssembler
 import xgboost as xgb
-import os
 import json
 import joblib
-import pandas as pd
 import numpy as np
 from sklearn.preprocessing import StandardScaler
+
+# Map Binance symbols to Yahoo Finance symbols
+symbol_map = {
+    "btcusdt": "BTC-USD",
+    "ethusdt": "ETH-USD",
+    "solusdt": "SOL-USD",
+    "bnbusdt": "BNB-USD",
+    "xrpusdt": "XRP-USD",
+    "adausdt": "ADA-USD",
+    "dogeusdt": "DOGE-USD",
+    "linkusdt": "LINK-USD",
+    "dotusdt": "DOT-USD",
+    "ltcusdt": "LTC-USD" 
+}
+
+# Output HDFS path
+output_dir = "hdfs://namenode:9000/crypto/yahoo"
+
+end_date = datetime.now()
+start_date = end_date - timedelta(days=365*2)  
+
+# Initialize Spark
+spark = SparkSession.builder.appName("YahooFinanceBatch").getOrCreate()
+
+for symbol_binance, symbol_yahoo in symbol_map.items():
+    print(f"[INFO] Start fetching {symbol_yahoo}...")
+    monthly_dfs = []
+
+    current = start_date
+    while current < end_date:
+        start = current
+        end = current + relativedelta(months=1)
+        print(f"[INFO] Fetching {symbol_yahoo}: {start.date()} -> {end.date()}")
+
+        try:
+            df = yf.download(
+                symbol_yahoo,
+                start=start,
+                end=end,
+                interval="1d",  # Daily intervals for long-term analysis
+                progress=False,
+            )
+            if df.empty:
+                print(f"[WARN] No data for {symbol_yahoo} in {start.strftime('%Y-%m')}")
+                current += relativedelta(months=1)
+                continue
+
+            df.reset_index(inplace=True)
+            monthly_dfs.append(df)
+        except Exception as e:
+            print(f"[ERROR] Failed to fetch {symbol_yahoo} in {start.strftime('%Y-%m')}: {e}")
+        
+        current += relativedelta(months=1)
+
+    if not monthly_dfs:
+        print(f"[ERROR] No valid data for {symbol_binance} over all months.")
+        continue
+
+    # Combine all monthly data
+    all_df = pd.concat(monthly_dfs)
+    all_df.columns = [c[0].lower().replace(' ', '_') if isinstance(c, tuple) else c.lower().replace(' ', '_') for c in all_df.columns]
+    
+    # Rename 'date' column to 'datetime' for consistency
+    if 'date' in all_df.columns:
+        all_df = all_df.rename(columns={'date': 'datetime'})
+    
+    # Ensure datetime column is properly formatted
+    all_df['datetime'] = pd.to_datetime(all_df['datetime'])
+
+    sdf = spark.createDataFrame(all_df)
+    save_path = f"hdfs://hdfs-namenode:8020/crypto/yahoo/{symbol_binance.lower()}"
+    sdf.write.mode("overwrite").parquet(save_path)
+
+    print(f"[INFO] Saving {symbol_binance} to {save_path}")
+    print(f"[SUCCESS] {symbol_binance} written to HDFS")
+
+spark.stop()
 
 symbols = [
     "btcusdt", "ethusdt", "solusdt", "bnbusdt", "xrpusdt",
@@ -85,33 +165,15 @@ def calculate_technical_indicators(df):
 spark = SparkSession.builder.appName("XGBoostMultiCrypto").getOrCreate()
 
 for symbol in symbols:
-    print(f"\n=== Training model for {symbol.upper()} ===")
     try:
         # Read data from HDFS
         path = f"hdfs://hdfs-namenode:8020/crypto/yahoo/{symbol}"
         df = spark.read.parquet(path).dropna()
-
-        # Convert to pandas for feature engineering
-        # Debug: Check data types and sample first
-        print(f"[DEBUG] {symbol.upper()}: DataFrame schema:")
-        df.printSchema()
         
         # Show the most recent data instead of oldest
         datetime_col = 'datetime' if 'datetime' in df.columns else 'date'
-        print(f"[DEBUG] {symbol.upper()}: Most recent data:")
-        df.orderBy(df[datetime_col].desc()).show(5)
-        
-        print(f"[DEBUG] {symbol.upper()}: Oldest data:")
-        df.orderBy(df[datetime_col].asc()).show(5)
-        
-        # Show data range summary
-        min_date = df.select(datetime_col).rdd.min()[0]
-        max_date = df.select(datetime_col).rdd.max()[0]
-        row_count = df.count()
-        print(f"[DEBUG] {symbol.upper()}: Data range: {min_date} to {max_date} ({row_count} rows)")
         
         try:
-            # Method 1: Handle both 'datetime' and 'date' column names
             datetime_col = None
             if 'datetime' in df.columns:
                 datetime_col = 'datetime'
@@ -131,11 +193,7 @@ for symbol in symbols:
             pdf['datetime'] = pd.to_datetime(pdf['datetime_str'])
             pdf = pdf.drop('datetime_str', axis=1)
             pdf = pdf.sort_values('datetime').reset_index(drop=True)
-            
-            print(f"[DEBUG] {symbol.upper()}: Pandas DataFrame shape: {pdf.shape}")
-            print(f"[DEBUG] {symbol.upper()}: Pandas columns: {list(pdf.columns)}")
-            print(f"[DEBUG] {symbol.upper()}: Pandas dtypes:\n{pdf.dtypes}")
-            
+              
         except Exception as pandas_error:
             print(f"[WARN] {symbol.upper()}: Method 1 failed, trying method 2: {pandas_error}")
             try:
@@ -147,10 +205,7 @@ for symbol in symbols:
                 
                 # Add a dummy datetime column for compatibility
                 pdf['datetime'] = pd.date_range(start='2020-01-01', periods=len(pdf), freq='D')
-                
-                print(f"[DEBUG] {symbol.upper()}: Method 2 - Pandas DataFrame shape: {pdf.shape}")
-                print(f"[DEBUG] {symbol.upper()}: Pandas columns: {list(pdf.columns)}")
-                
+                                
             except Exception as pandas_error2:
                 print(f"[ERROR] {symbol.upper()}: Method 2 failed, trying method 3: {pandas_error2}")
                 try:
@@ -171,9 +226,7 @@ for symbol in symbols:
                     pdf['datetime'] = pd.to_datetime(pdf['datetime_str'])
                     pdf = pdf.drop('datetime_str', axis=1)
                     pdf = pdf.sort_values('datetime').reset_index(drop=True)
-                    
-                    print(f"[DEBUG] {symbol.upper()}: Method 3 - Pandas DataFrame shape: {pdf.shape}")
-                    
+                                     
                 except Exception as pandas_error3:
                     print(f"[ERROR] {symbol.upper()}: All pandas conversion methods failed: {pandas_error3}")
                     continue
@@ -360,26 +413,15 @@ for symbol in symbols:
             "test_data_points": len(X_test)
         }
 
-        # Save model and scaler locally
-        local_model_path = f"/opt/spark/work-dir/models/xgboost_{symbol}.pkl"
-        local_scaler_path = f"/opt/spark/work-dir/models/scaler_{symbol}.pkl"
         local_pred_path = f"/opt/spark/work-dir/models/xgboost_{symbol}_prediction.json"
         
-        joblib.dump(model, local_model_path)
-        joblib.dump(scaler, local_scaler_path)
-
         with open(local_pred_path, "w") as f:
             json.dump(prediction_result, f, indent=2)
 
         print(f"[{symbol.upper()}] Model, scaler & prediction saved to local")
 
-        # Upload to HDFS
-        hdfs_model_path = f"hdfs://hdfs-namenode:8020/models/xgboost_{symbol}.pkl"
-        hdfs_scaler_path = f"hdfs://hdfs-namenode:8020/models/scaler_{symbol}.pkl"
         hdfs_pred_path = f"hdfs://hdfs-namenode:8020/models/xgboost_{symbol}_prediction.json"
 
-        os.system(f"hadoop fs -put -f {local_model_path} {hdfs_model_path}")
-        os.system(f"hadoop fs -put -f {local_scaler_path} {hdfs_scaler_path}")
         os.system(f"hadoop fs -put -f {local_pred_path} {hdfs_pred_path}")
 
         print(f"[{symbol.upper()}] Uploaded to HDFS successfully")
@@ -390,5 +432,4 @@ for symbol in symbols:
         print(f"[ERROR] {symbol.upper()}: Full traceback:")
         traceback.print_exc()
 
-print("Training finished for all symbols.")
 spark.stop()
