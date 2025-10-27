@@ -1,13 +1,13 @@
 body {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   margin: 20px;
-  background: #f0f4f8;
-  color: #333;
+  background: #0b1221;
+  color: #e6e8eb;
 }
 
 h1 {
   text-align: center;
-  color: #2c3e50;
+  color: #e6e8eb;
   margin-bottom: 30px;
 }
 
@@ -19,7 +19,7 @@ h1 {
 }
 
 .crypto-card {
-  background: #fff;
+  background: radial-gradient(circle at top left, rgba(25, 35, 60, 0.9), rgba(15, 20, 35, 0.95));
   border-radius: 10px;
   padding: 20px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
@@ -32,7 +32,7 @@ h1 {
 
 .crypto-card h2 {
   margin-top: 0;
-  color: #1a5276;
+  color: #f5f7fa;
 }
 
 .crypto-details p {
@@ -43,17 +43,17 @@ h1 {
 .prediction {
   margin-top: 10px;
   font-weight: bold;
-  color: green;
+  color: #4fd1c5;
 }
 
 .price-up {
-  color: #28a745 !important;
+  color: #16c784 !important;
   font-weight: bold;
   transition: color 0.3s ease-in-out;
 }
 
 .price-down {
-  color: #dc3545 !important;
+  color: #ea3943 !important;
   font-weight: bold;
   transition: color 0.3s ease-in-out;
 }
@@ -69,7 +69,7 @@ h1 {
   right: 20px;
   width: 450px;
   height: 700px;
-  background-color: #2c2c2e;
+  background: radial-gradient(circle at top left, rgba(25, 35, 60, 0.9), rgba(15, 20, 35, 0.95));
   border-radius: 10px;
   box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
   display: flex;
@@ -79,7 +79,7 @@ h1 {
 }
 
 .chat-header {
-  background-color: #3a3a3c;
+  background-color: rgba(25, 35, 60, 0.9);
   padding: 15px;
   text-align: center;
   border-bottom: 1px solid #444;
@@ -146,7 +146,7 @@ h1 {
 }
 
 .bot-message {
-  background-color: #3a3a3c;
+  background-color: rgba(25, 35, 60, 0.9);
   color: #f2f2f7;
   align-self: flex-start;
   border-bottom-left-radius: 4px;
@@ -161,8 +161,8 @@ h1 {
   width: 10px;
   height: 10px;
   border-radius: 5px;
-  background-color: #9880ff;
-  color: #9880ff;
+  background-color: #58a6ff;
+  color: #58a6ff;
   animation: dotFlashing 1s infinite linear alternate;
   animation-delay: .5s;
 }
@@ -179,8 +179,8 @@ h1 {
   width: 10px;
   height: 10px;
   border-radius: 5px;
-  background-color: #9880ff;
-  color: #9880ff;
+  background-color: #58a6ff;
+  color: #58a6ff;
   animation: dotFlashing 1s infinite alternate;
   animation-delay: 0s;
 }
@@ -190,19 +190,19 @@ h1 {
   width: 10px;
   height: 10px;
   border-radius: 5px;
-  background-color: #9880ff;
-  color: #9880ff;
+  background-color: #58a6ff;
+  color: #58a6ff;
   animation: dotFlashing 1s infinite alternate;
   animation-delay: 1s;
 }
 
 @keyframes dotFlashing {
   0% {
-    background-color: #9880ff;
+    background-color: #58a6ff;
   }
   50%,
   100% {
-    background-color: #612fe04d;
+    background-color: #007aff;
   }
 }
 
@@ -220,7 +220,7 @@ h1 {
   border: none;
   padding: 10px;
   border-radius: 20px;
-  background-color: #3a3a3c;
+  background-color: rgba(15, 20, 35, 0.95);
   color: white;
   outline: none;
 }
