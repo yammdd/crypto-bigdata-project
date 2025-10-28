@@ -14,7 +14,6 @@ from newsapi import NewsApiClient
 import requests
 import trafilatura
 import uuid
-from langdetect import detect
 
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "your-secret-key-change-this")
@@ -37,15 +36,6 @@ except Exception as e:
     newsapi = None
 
 CONTEXT_DOCUMENT_ID = "latest_market_context"
-
-def detect_language(text):
-    try:
-        code = detect(text)
-        if code == "vi": return "Vietnamese"
-        if code == "es": return "Spanish"
-        return "English"
-    except:
-        return "English"
 
 def get_or_create_session_id():
     """Get or create a session ID for the current user"""
@@ -88,22 +78,30 @@ def get_chat_history_summary(session_id):
 def get_intent_from_prompt(user_question, chat_summary):
     if not model:
         # Fallback for when AI is not configured
-        return {"intent": "unknown", "crypto_topic": "General", "mood": "neutral", "language": "English"}
+        return {
+            "intent": "unknown",
+            "crypto_topic": "General",
+            "mood": "neutral",
+            "language": "English",
+            "crypto_question_parts": user_question,
+            "is_calculation_or_logic": False
+        }
 
     prompt = f"""
-        You are an AI assistant that analyzes user queries for a cryptocurrency chatbot. Your task is to understand the user's intent, identify key topics, and detect their mood based on their latest message and the conversation history.
+        You are an AI assistant that analyzes user queries for a cryptocurrency chatbot. Your task is to deeply understand the user's intent, identify key topics, detect their mood, and determine the primary language.
 
         Analyze the following information and return a single, minified JSON object with the following keys:
         - "intent": (string) Classify the user's primary intent. Possible values: "greeting", "crypto_question", "general_question", "contextual_question", "irrelevant_question".
-        - "crypto_topic": (string) If the intent is "crypto_question" or a follow-up, identify the specific cryptocurrency being discussed (e.g., "Bitcoin", "Dogecoin", "Ethereum"). If no specific crypto is mentioned or implied by the context, use "General". If not a crypto question, use "None".
-        - "mood": (string) Analyze the user's likely mood. Possible values: "curious", "happy", "frustrated", "neutral", "confused", "urgent".
-        - "language": (string) Identify the language of the user's question (e.g., "English", "Vietnamese").
+        - "crypto_topic": (string) If the intent is "crypto_question", identify the specific crypto (e.g., "Bitcoin", "Dogecoin"). If general, use "General". If not a crypto question, use "None".
+        - "mood": (string) Analyze the user's likely mood (e.g., "curious", "happy", "frustrated", "neutral").
+        - "language": (string) Identify the dominant language of the "User's Question". You must support ALL languages. If multiple languages are present, choose the one with the most words. (e.g., "Vietnamese", "English", "Spanish", "Japanese").
+        - "crypto_question_parts": (string) Extract ONLY the parts of the user's question that are related to cryptocurrency. If the whole question is about crypto, return the whole question.
+        - "is_calculation_or_logic": (boolean) Set to true if the crypto-related part is a math/logic problem (e.g., "If I buy BTC at 30k and it goes to 36k, what is my profit?", "Is a 20% portfolio gain reasonable if BTC rose 10%?").
 
         ### Rules:
-        - "contextual_question": Use this for questions about the conversation itself, like "what did I just ask you?" or "summarize our chat".
-        - "general_question": Use this for non-crypto questions that are not completely irrelevant (e.g., "who are you?", "what can you do?").
-        - "crypto_topic": Look at the "User's Question" first. If no crypto is mentioned, use the "Previous Conversation History" to find the most recent topic. For example, if the previous question was about DOGE and the new question is "is it a good investment?", the topic is "Dogecoin".
-        - Respond ONLY with the JSON object.
+        - For a mixed question like "What is BTC price and what is the capital of France?", the "intent" should be "crypto_question", and "crypto_question_parts" should ONLY be "What is BTC price?".
+        - If the question is purely non-crypto, the "intent" is "irrelevant_question" and "crypto_question_parts" should be empty.
+        - The "is_calculation_or_logic" flag is crucial for routing the question correctly.
 
         ---
         ### Previous Conversation History
@@ -129,7 +127,14 @@ def get_intent_from_prompt(user_question, chat_summary):
             raise ValueError("No JSON object found in response")
     except Exception as e:
         print(f"Error parsing intent from AI: {e}")
-        return {"intent": "crypto_question", "crypto_topic": "General", "mood": "neutral", "language": "English"}
+        return {
+            "intent": "crypto_question",
+            "crypto_topic": "General",
+            "mood": "neutral",
+            "language": "English",
+            "crypto_question_parts": user_question,
+            "is_calculation_or_logic": False
+        }
 
 def ensure_table_exists(connection, table_name):
     tables = [t.decode() for t in connection.tables()]
@@ -397,41 +402,75 @@ def ask_chatbot():
     intent = intent_data.get("intent")
     crypto_topic = intent_data.get("crypto_topic")
     user_mood = intent_data.get("mood", "neutral")
-    user_language = detect_language(user_question)
+    user_language = intent_data.get("language", "English")
+    crypto_question_part = intent_data.get("crypto_question_parts") or user_question
+    is_calculation = intent_data.get("is_calculation_or_logic", False)
     
-    print(f"[CHATBOT] Intent Detected: {intent}, Topic: {crypto_topic}, Mood: {user_mood}, Language: {user_language}")
+    print(f"[CHATBOT] Intent: {intent}, Topic: {crypto_topic}, Lang: {user_language}, IsCalc: {is_calculation}")
+    print(f"[CHATBOT] Relevant Question Part: '{crypto_question_part}'")
 
-    # 2. Handle non-crypto intents directly
-    if intent in ["greeting", "general_question", "irrelevant_question", "contextual_question"]:
-        answer = ""
-        # Create a simple prompt for these cases
-        simple_prompt = f"""
-            You are a helpful crypto analyst AI. Based on the conversation history, provide a concise answer to the user's question.
-            ### IMPORTANT ###
-            - You MUST answer in {user_language}.
-            - DO NOT provide financial advice.
-            - DO NOT add any sources or citations.
+    if intent == "crypto_question" and is_calculation:
+        print("[CHATBOT] Handling a crypto calculation/logic question.")
+        # PROMPT ĐÃ ĐƯỢC NÂNG CẤP ĐỂ YÊU CẦU GIẢI THÍCH
+        calc_prompt = f"""
+            You are a helpful and clear-thinking AI assistant with expertise in finance and mathematics.
+            The user has a question that requires calculation or logical reasoning related to cryptocurrency.
+            Your task is to answer the user's question clearly and provide a simple, step-by-step explanation of how you arrived at the answer.
+
+            ### INSTRUCTIONS ###
+            1.  First, state the final answer clearly and directly.
+            2.  Then, in a new paragraph, explain the formula or the logic you used in simple terms.
+            3.  Finally, show the actual numbers from the user's question being used in the calculation.
+            4.  You MUST formulate your entire response in {user_language}.
 
             --- Conversation History ---
             {chat_history_summary}
             ---
             User's Question: "{user_question}"
             ---
-            Your Answer:
+            Your clear answer with a step-by-step explanation in {user_language}:
         """
-        
-        if intent == "greeting":
-            # Greetings can often be hardcoded for speed and consistency
-            answer = "Xin chào! Tôi là trợ lý phân tích thị trường crypto. Tôi có thể giúp gì cho bạn hôm nay?" if user_language == "Vietnamese" else "Hello! I'm your crypto market analyst AI. How can I help you today?"
-        elif intent == "irrelevant_question":
-            answer = "Tôi là AI chuyên về phân tích thị trường tiền điện tử. Vui lòng đặt câu hỏi liên quan đến crypto, giao dịch hoặc blockchain." if user_language == "Vietnamese" else "I am an AI specialized in cryptocurrency market analysis. Please ask questions related to crypto, trading, or blockchain."
-        else: # For general_question and contextual_question, let the AI generate the response
-            try:
-                response = model.generate_content(simple_prompt)
-                answer = response.text
-            except Exception as e:
-                print(f"Error calling Gemini for simple question: {e}")
-                answer = "I'm sorry, I encountered an error."
+        try:
+            response = model.generate_content(calc_prompt)
+            answer = response.text
+            add_to_chat_history(session_id, user_question, answer, user_mood)
+            return jsonify({"answer": answer})
+        except Exception as e:
+            print(f"Error calling Gemini for calculation question: {e}")
+            answer = "I'm sorry, I encountered an error while processing your calculation."
+            add_to_chat_history(session_id, user_question, answer, user_mood)
+            return jsonify({"answer": answer})
+
+    # 2. Handle non-crypto intents directly
+    if intent in ["greeting", "general_question", "irrelevant_question", "contextual_question"]:
+        answer = ""
+        # Create a simple prompt for these cases
+        print(f"[CHATBOT] Handling simple intent '{intent}' in {user_language}.")
+        simple_prompt = f"""
+            You are a helpful crypto analyst AI. Your task is to provide a simple, direct response based on the user's intent.
+            You MUST formulate your entire response in {user_language}.
+            Do not add any extra formatting, sources, or financial advice.
+
+            ### Instructions ###
+            Based on the provided intent, generate the appropriate response:
+            - If the intent is "greeting": Provide a friendly, brief greeting welcoming the user.
+            - If the intent is "irrelevant_question": Politely explain that you are an AI specialized in cryptocurrency and cannot answer topics outside of this domain.
+            - If the intent is "general_question" (e.g., "who are you?") or "contextual_question" (e.g., "what did I ask before?"): Answer the user's question concisely based on your role and the conversation history.
+
+            --- Conversation History ---
+            {chat_history_summary}
+            ---
+            Detected Intent: "{intent}"
+            User's Question: "{user_question}"
+            ---
+            Your concise response in {user_language}:
+        """
+        try:
+            response = model.generate_content(simple_prompt)
+            answer = response.text
+        except Exception as e:
+            print(f"Error calling Gemini for simple question: {e}")
+            answer = "I'm sorry, I encountered an error. Please try again."
 
         add_to_chat_history(session_id, user_question, answer, user_mood)
         return jsonify({"answer": answer})
@@ -512,6 +551,14 @@ def ask_chatbot():
     # 6. Generate the Final Prompt for the AI
     prompt = ""
     language_instruction = f"You MUST formulate your entire response in {user_language}."
+
+    additional_instruction = ""
+    if intent == "crypto_question" and crypto_question_part.strip() != user_question.strip():
+        additional_instruction = f"""
+        ---
+        IMPORTANT FINAL INSTRUCTION: The user's original question was "{user_question}". You have correctly focused on analyzing the crypto-related part. After providing your full, comprehensive analysis, you MUST add a concluding sentence at the very end. This sentence should politely state that the other topics in their original question are outside your expertise as a crypto analyst.
+        """
+
     # Tạo Prompt cho Gemini
     if has_relevant_news:
         # Nếu CÓ tin-tức, dùng prompt đầy-đủ
@@ -560,7 +607,9 @@ def ask_chatbot():
         {sources_list_markdown}
         --- End of Sources ---
 
-        **User's Question:** {user_question}
+        **User's Question:** {crypto_question_part}
+
+        {additional_instruction}
 
         **Your Expert Answer:**
         """
@@ -592,7 +641,10 @@ def ask_chatbot():
         {technical_analysis_summary}
         ---
 
-        **User's Question:** {user_question}
+        **User's Question:** {crypto_question_part}
+
+        {additional_instruction}
+
         **Your Expert Answer:**
         """
 

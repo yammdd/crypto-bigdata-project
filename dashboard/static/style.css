@@ -128,8 +128,6 @@ h1 {
 .bot-message a {
   color: #58a6ff;
   text-decoration: none;
-  overflow-wrap: break-word;
-  word-break: break-all;
 }
 
 .bot-message a:hover {
@@ -152,6 +150,8 @@ h1 {
   color: #f2f2f7;
   align-self: flex-start;
   border-bottom-left-radius: 4px;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .loading-message {
