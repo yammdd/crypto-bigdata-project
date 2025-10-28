@@ -37,7 +37,6 @@ except Exception as e:
 
 CONTEXT_DOCUMENT_ID = "latest_market_context"
 
-
 def get_or_create_session_id():
     """Get or create a session ID for the current user"""
     if 'session_id' not in session:
@@ -45,15 +44,16 @@ def get_or_create_session_id():
     return session['session_id']
 
 
-def add_to_chat_history(session_id, question, answer):
-    """Add a question-answer pair to the chat history"""
+def add_to_chat_history(session_id, question, answer, mood="neutral"):
+    """Add a question-answer pair and mood to the chat history"""
     if session_id not in chat_history:
         chat_history[session_id] = []
     
     chat_history[session_id].append({
         "timestamp": datetime.now().isoformat(),
         "question": question,
-        "answer": answer
+        "answer": answer,
+        "mood": mood
     })
     
     # Keep only the last 10 conversations to prevent memory bloat
@@ -75,153 +75,66 @@ def get_chat_history_summary(session_id):
     
     return "\n".join(summary_parts)
 
+def get_intent_from_prompt(user_question, chat_summary):
+    if not model:
+        # Fallback for when AI is not configured
+        return {
+            "intent": "unknown",
+            "crypto_topic": "General",
+            "mood": "neutral",
+            "language": "English",
+            "crypto_question_parts": user_question,
+            "is_calculation_or_logic": False
+        }
 
-def is_greeting(question):
-    """Check if the question is a simple greeting"""
-    greeting_words = [
-        "hello", "hi", "hey", "good morning", "good afternoon", "good evening",
-        "greetings", "howdy", "what's up", "how are you", "how do you do"
-    ]
-    
-    question_lower = question.lower().strip()
-    
-    # Check for exact matches or questions that are just greetings
-    for greeting in greeting_words:
-        if question_lower == greeting or question_lower.startswith(greeting + " "):
-            return True
-    
-    # Check for greeting + "who are you" patterns
-    if any(greeting in question_lower for greeting in greeting_words) and "who are you" in question_lower:
-        return True
-        
-    return False
+    prompt = f"""
+        You are an AI assistant that analyzes user queries for a cryptocurrency chatbot. Your task is to deeply understand the user's intent, identify key topics, detect their mood, and determine the primary language.
 
+        Analyze the following information and return a single, minified JSON object with the following keys:
+        - "intent": (string) Classify the user's primary intent. Possible values: "greeting", "crypto_question", "general_question", "contextual_question", "irrelevant_question".
+        - "crypto_topic": (string) If the intent is "crypto_question", identify the specific crypto (e.g., "Bitcoin", "Dogecoin"). If general, use "General". If not a crypto question, use "None".
+        - "mood": (string) Analyze the user's likely mood (e.g., "curious", "happy", "frustrated", "neutral").
+        - "language": (string) Identify the dominant language of the "User's Question". You must support ALL languages. If multiple languages are present, choose the one with the most words. (e.g., "Vietnamese", "English", "Spanish", "Japanese").
+        - "crypto_question_parts": (string) Extract ONLY the parts of the user's question that are related to cryptocurrency. If the whole question is about crypto, return the whole question.
+        - "is_calculation_or_logic": (boolean) Set to true if the crypto-related part is a math/logic problem (e.g., "If I buy BTC at 30k and it goes to 36k, what is my profit?", "Is a 20% portfolio gain reasonable if BTC rose 10%?").
 
-def is_crypto_related(question, chat_history_summary=""):
-    """Check if the question is related to cryptocurrency or trading"""
-    crypto_keywords = [
-        # Cryptocurrency names
-        "bitcoin", "btc", "ethereum", "eth", "binance", "bnb", "solana", "sol",
-        "ripple", "xrp", "cardano", "ada", "dogecoin", "doge", "chainlink", "link",
-        "polkadot", "dot", "litecoin", "ltc", "usdt", "usdc", "tether",
-        
-        # Trading terms
-        "crypto", "cryptocurrency", "trading", "buy", "sell", "price", "market",
-        "bullish", "bearish", "pump", "dump", "hodl", "moon", "lambo",
-        "altcoin", "defi", "nft", "blockchain", "mining", "wallet", "exchange",
-        
-        # Financial terms in crypto context
-        "portfolio", "profit", "loss", "gains", "returns",
-        "volatility", "liquidity", "market cap", "volume", "resistance", "support",
-        
-        # Technical analysis
-        "rsi", "macd", "bollinger", "fibonacci", "candlestick", "chart",
-        "technical analysis", "fundamental analysis", "trend", "breakout"
-    ]
-    
-    question_lower = question.lower()
-    
-    # Check if any crypto keyword is mentioned in the current question
-    for keyword in crypto_keywords:
-        if keyword in question_lower:
-            return True
-    
-    # Check for currency symbols and common crypto patterns
-    crypto_patterns = [
-        r'\$[a-z]{3,6}',  # $BTC, $ETH, etc.
-        r'[a-z]{3,6}usdt',  # BTCUSDT, ETHUSDT, etc.
-        r'[a-z]{3,6}/usdt',  # BTC/USDT, ETH/USDT, etc.
-    ]
-    
-    import re
-    for pattern in crypto_patterns:
-        if re.search(pattern, question_lower):
-            return True
-    
-    # Check if the question is a follow-up to a crypto conversation
-    if chat_history_summary and chat_history_summary != "No previous conversation history.":
-        # Look for crypto keywords in recent conversation history
-        history_lower = chat_history_summary.lower()
-        for keyword in crypto_keywords:
-            if keyword in history_lower:
-                # If the current question contains investment-related terms and there's crypto context
-                investment_terms = ["worth", "invest", "investing", "buy", "sell", "should i", "recommend", "advice", "good", "bad", "safe", "risky"]
-                if any(term in question_lower for term in investment_terms):
-                    return True
-    
-    return False
+        ### Rules:
+        - For a mixed question like "What is BTC price and what is the capital of France?", the "intent" should be "crypto_question", and "crypto_question_parts" should ONLY be "What is BTC price?".
+        - If the question is purely non-crypto, the "intent" is "irrelevant_question" and "crypto_question_parts" should be empty.
+        - The "is_calculation_or_logic" flag is crucial for routing the question correctly.
 
+        ---
+        ### Previous Conversation History
+        {chat_summary}
+        ---
+        ### User's Question
+        {user_question}
+        ---
 
-def is_irrelevant_question(question):
-    """Check if the question is completely irrelevant to crypto/trading"""
-    irrelevant_topics = [
-        # Math and science
-        "calculate", "solve", "equation", "formula", "mathematics", "math",
-        "physics", "chemistry", "biology", "science", "experiment", "problem",
-        "2+2", "addition", "subtraction", "multiplication", "division",
-        
-        # Programming
-        "code", "programming", "python", "javascript", "java", "c++", "html", "css",
-        "algorithm", "function", "variable", "debug", "compile", "syntax",
-        "write code", "program", "software", "development",
-        
-        # Literature and arts
-        "poem", "poetry", "novel", "book", "author", "writer", "literature",
-        "art", "painting", "music", "song", "movie", "film", "actor",
-        "shakespeare", "shakespeare", "poetry", "novel", "story",
-        
-        # General knowledge
-        "history", "geography", "politics", "sports", "cooking", "recipe",
-        "travel", "weather", "health", "medicine", "psychology",
-        "pasta", "food", "restaurant", "hotel", "vacation",
-        
-        # Personal questions
-        "your name", "your age", "your favorite", "your opinion on",
-        "what do you think about", "do you like", "are you",
-        "how are you", "what's your", "tell me about yourself"
-    ]
-    
-    question_lower = question.lower()
-    
-    # Check if question contains irrelevant topics
-    has_irrelevant = any(topic in question_lower for topic in irrelevant_topics)
-    
-    # If it has irrelevant topics, it's irrelevant (regardless of crypto context)
-    # This prevents the AI from trying to relate everything back to crypto
-    return has_irrelevant
-
-
-def extract_crypto_from_context(chat_history_summary):
-    """Extract cryptocurrency information from conversation context"""
-    if not chat_history_summary or chat_history_summary == "No previous conversation history.":
-        return None, None
-    
-    all_symbols = ["btcusdt", "ethusdt", "bnbusdt", "solusdt", "xrpusdt", "adausdt", "dogeusdt", "linkusdt", "dotusdt", "ltcusdt"]
-    
-    coin_name_map = {
-        "btc": "bitcoin", "eth": "ethereum", "bnb": "binance coin",
-        "sol": "solana", "xrp": "ripple", "ada": "cardano",
-        "doge": "dogecoin", "link": "chainlink", "dot": "polkadot",
-        "ltc": "litecoin"
-    }
-    
-    history_lower = chat_history_summary.lower()
-    
-    # Look for cryptocurrency mentions in the conversation history
-    for s_with_usdt in all_symbols:
-        s_without_usdt = s_with_usdt.replace("usdt", "")
-        
-        # Check for symbol mentions (BTC, ETH, DOGE, etc.)
-        if s_without_usdt.upper() in history_lower.upper():
-            return s_with_usdt, coin_name_map.get(s_without_usdt, s_without_usdt)
-        
-        # Check for full name mentions (bitcoin, ethereum, dogecoin, etc.)
-        coin_name = coin_name_map.get(s_without_usdt)
-        if coin_name and coin_name in history_lower:
-            return s_with_usdt, coin_name
-    
-    return None, None
-
+        JSON response:
+    """
+    try:
+        response = model.generate_content(prompt)
+        # Clean up the response to ensure it's valid JSON
+        text_response = response.text
+        start_index = text_response.find('{')
+        end_index = text_response.rfind('}') + 1
+        if start_index != -1 and end_index != -1:
+            json_str = text_response[start_index:end_index]
+            result = json.loads(json_str)
+            return result
+        else:
+            raise ValueError("No JSON object found in response")
+    except Exception as e:
+        print(f"Error parsing intent from AI: {e}")
+        return {
+            "intent": "crypto_question",
+            "crypto_topic": "General",
+            "mood": "neutral",
+            "language": "English",
+            "crypto_question_parts": user_question,
+            "is_calculation_or_logic": False
+        }
 
 def ensure_table_exists(connection, table_name):
     tables = [t.decode() for t in connection.tables()]
@@ -471,6 +384,7 @@ def predict_realtime(symbol):
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
+
 @app.route("/api/chatbot/ask", methods=["POST"])
 def ask_chatbot():
     if not model:
@@ -480,91 +394,115 @@ def ask_chatbot():
     if not user_question:
         return jsonify({"error": "Question is required."}), 400
     
-    # Get or create session ID for this user
     session_id = get_or_create_session_id()
-    
-    # Get chat history for context
     chat_history_summary = get_chat_history_summary(session_id)
     
-    # 1. CHECK FOR SIMPLE GREETINGS
-    if is_greeting(user_question):
-        if "who are you" in user_question.lower():
-            answer = """Hello! I'm a specialized cryptocurrency market analyst AI. I can help you with:
-
-• **Crypto Market Analysis** - Current prices, trends, and market conditions
-• **Technical Analysis** - RSI, moving averages, support/resistance levels
-• **News Analysis** - Latest crypto news and market sentiment
-• **Trading Insights** - Buy/sell recommendations based on data
-• **Portfolio Guidance** - Investment strategies and risk assessment
-
-What would you like to know about the crypto market today?"""
-        else:
-            answer = "Hi! I'm your crypto market analyst. What can I help you with today? I can analyze market trends, provide technical insights, or discuss the latest crypto news."
-        
-        # Store the conversation
-        add_to_chat_history(session_id, user_question, answer)
-        return jsonify({"answer": answer})
+    # 1. NEW: Get intent and entities from the AI model
+    intent_data = get_intent_from_prompt(user_question, chat_history_summary)
+    intent = intent_data.get("intent")
+    crypto_topic = intent_data.get("crypto_topic")
+    user_mood = intent_data.get("mood", "neutral")
+    user_language = intent_data.get("language", "English")
+    crypto_question_part = intent_data.get("crypto_question_parts") or user_question
+    is_calculation = intent_data.get("is_calculation_or_logic", False)
     
-    # 2. CHECK FOR IRRELEVANT QUESTIONS
-    if is_irrelevant_question(user_question):
-        answer = "I'm a specialized cryptocurrency market analyst AI. I can only help with crypto-related questions, market analysis, and trading insights. Please ask me about cryptocurrency markets, trading, or blockchain topics."
-        
-        # Store the conversation
-        add_to_chat_history(session_id, user_question, answer)
-        return jsonify({"answer": answer})
-    
-    # 3. CHECK IF QUESTION IS CRYPTO-RELATED (with context)
-    if not is_crypto_related(user_question, chat_history_summary):
-        answer = "I'm a specialized cryptocurrency market analyst AI. Your question doesn't seem to be related to cryptocurrency, trading, or blockchain topics. I can help you with crypto market analysis, technical indicators, trading strategies, or the latest crypto news. What would you like to know about the crypto market?"
-        
-        # Store the conversation
-        add_to_chat_history(session_id, user_question, answer)
+    print(f"[CHATBOT] Intent: {intent}, Topic: {crypto_topic}, Lang: {user_language}, IsCalc: {is_calculation}")
+    print(f"[CHATBOT] Relevant Question Part: '{crypto_question_part}'")
+
+    if intent == "crypto_question" and is_calculation:
+        print("[CHATBOT] Handling a crypto calculation/logic question.")
+        # PROMPT ĐÃ ĐƯỢC NÂNG CẤP ĐỂ YÊU CẦU GIẢI THÍCH
+        calc_prompt = f"""
+            You are a helpful and clear-thinking AI assistant with expertise in finance and mathematics.
+            The user has a question that requires calculation or logical reasoning related to cryptocurrency.
+            Your task is to answer the user's question clearly and provide a simple, step-by-step explanation of how you arrived at the answer.
+
+            ### INSTRUCTIONS ###
+            1.  First, state the final answer clearly and directly.
+            2.  Then, in a new paragraph, explain the formula or the logic you used in simple terms.
+            3.  Finally, show the actual numbers from the user's question being used in the calculation.
+            4.  You MUST formulate your entire response in {user_language}.
+
+            --- Conversation History ---
+            {chat_history_summary}
+            ---
+            User's Question: "{user_question}"
+            ---
+            Your clear answer with a step-by-step explanation in {user_language}:
+        """
+        try:
+            response = model.generate_content(calc_prompt)
+            answer = response.text
+            add_to_chat_history(session_id, user_question, answer, user_mood)
+            return jsonify({"answer": answer})
+        except Exception as e:
+            print(f"Error calling Gemini for calculation question: {e}")
+            answer = "I'm sorry, I encountered an error while processing your calculation."
+            add_to_chat_history(session_id, user_question, answer, user_mood)
+            return jsonify({"answer": answer})
+
+    # 2. Handle non-crypto intents directly
+    if intent in ["greeting", "general_question", "irrelevant_question", "contextual_question"]:
+        answer = ""
+        # Create a simple prompt for these cases
+        print(f"[CHATBOT] Handling simple intent '{intent}' in {user_language}.")
+        simple_prompt = f"""
+            You are a helpful crypto analyst AI. Your task is to provide a simple, direct response based on the user's intent.
+            You MUST formulate your entire response in {user_language}.
+            Do not add any extra formatting, sources, or financial advice.
+
+            ### Instructions ###
+            Based on the provided intent, generate the appropriate response:
+            - If the intent is "greeting": Provide a friendly, brief greeting welcoming the user.
+            - If the intent is "irrelevant_question": Politely explain that you are an AI specialized in cryptocurrency and cannot answer topics outside of this domain.
+            - If the intent is "general_question" (e.g., "who are you?") or "contextual_question" (e.g., "what did I ask before?"): Answer the user's question concisely based on your role and the conversation history.
+
+            --- Conversation History ---
+            {chat_history_summary}
+            ---
+            Detected Intent: "{intent}"
+            User's Question: "{user_question}"
+            ---
+            Your concise response in {user_language}:
+        """
+        try:
+            response = model.generate_content(simple_prompt)
+            answer = response.text
+        except Exception as e:
+            print(f"Error calling Gemini for simple question: {e}")
+            answer = "I'm sorry, I encountered an error. Please try again."
+
+        add_to_chat_history(session_id, user_question, answer, user_mood)
         return jsonify({"answer": answer})
 
+
+    # 3. For crypto questions, proceed with data gathering
     all_symbols = ["btcusdt", "ethusdt", "bnbusdt", "solusdt", "xrpusdt", "adausdt", "dogeusdt", "linkusdt", "dotusdt", "ltcusdt"]
-    
-    # 4. PHÂN TÍCH CÂU HỎI ĐỂ TÌM COIN MỤC TIÊU (CHỈ KHI LÀ CRYPTO-RELATED)
-    target_symbol = None
-    target_coin_name = None
-    
     coin_name_map = {
-        "btc": "bitcoin", "eth": "ethereum", "bnb": "binance coin",
-        "sol": "solana", "xrp": "ripple", "ada": "cardano",
-        "doge": "dogecoin", "link": "chainlink", "dot": "polkadot",
-        "ltc": "litecoin"
+        "bitcoin": "btcusdt", "ethereum": "ethusdt", "binance coin": "bnbusdt",
+        "solana": "solusdt", "ripple": "xrpusdt", "cardano": "adausdt",
+        "dogecoin": "dogeusdt", "chainlink": "linkusdt", "polkadot": "dotusdt",
+        "litecoin": "ltcusdt"
     }
 
-    # First, try to find crypto mentioned in the current question
-    for s_with_usdt in all_symbols:
-        s_without_usdt = s_with_usdt.replace("usdt", "")
-        if s_without_usdt.upper() in user_question.upper() or \
-           (coin_name_map.get(s_without_usdt) and coin_name_map.get(s_without_usdt).upper() in user_question.upper()):
-            target_symbol = s_with_usdt
-            target_coin_name = coin_name_map.get(s_without_usdt, s_without_usdt)
-            break
+    target_symbol = None
+    if crypto_topic and crypto_topic.lower() in coin_name_map:
+        target_symbol = coin_name_map[crypto_topic.lower()]
     
-    # If no crypto found in current question, try to extract from conversation context
-    if not target_symbol:
-        context_symbol, context_coin_name = extract_crypto_from_context(chat_history_summary)
-        if context_symbol:
-            target_symbol = context_symbol
-            target_coin_name = context_coin_name
-            print(f"[CHATBOT] Using crypto from context: {target_symbol} ({target_coin_name})")
-
-    if target_coin_name:
-        news_query = f'"{target_coin_name}" OR "{target_symbol.replace("usdt", "").upper()}"'
+    # Fetch news based on the detected topic
+    if crypto_topic and crypto_topic != "General" and crypto_topic != "None":
+        news_query = f'"{crypto_topic}"'
         print(f"[CHATBOT] Crawling news with specific query: {news_query}")
-        news_data = get_and_scrape_news(query=news_query, articles_to_fetch=3) # Crawl 3 bài liên quan nhất
+        news_data = get_and_scrape_news(query=news_query, articles_to_fetch=3)
     else:
         print("[CHATBOT] Crawling news with generic query.")
         news_data = get_and_scrape_news(articles_to_fetch=3)
-
+        
     full_article_content = news_data.get("full_text")
     sources_list_markdown = news_data.get("sources_markdown")
+    has_relevant_news = bool(sources_list_markdown)
 
-    has_relevant_news = bool(sources_list_markdown) 
-
-    # XÂY DỰNG BẢN TÓM TẮT THỊ TRƯỜNG TỔNG QUAN TỪ HBASE
+    # 4. Build Market Snapshot
     market_snapshot_data = []
     try:
         connection = happybase.Connection(host=os.getenv("HBASE_THRIFT_HOST", "hbase"), port=int(os.getenv("HBASE_THRIFT_PORT", "9090")))
@@ -584,21 +522,11 @@ What would you like to know about the crypto market today?"""
         formatted_data_summary = "\n".join(market_snapshot_data)
         if not formatted_data_summary:
             formatted_data_summary = "Could not retrieve market snapshot from HBase."
-            
     except Exception as e:
         formatted_data_summary = f"Error retrieving market snapshot: {e}"
 
-
-    # Phân tích câu hỏi của người dùng để tìm symbol mục tiêu
-    target_symbol = None
-    for s_with_usdt in all_symbols:
-        s_without_usdt = s_with_usdt.replace("usdt", "")
-        if s_without_usdt.upper() in user_question.upper():
-            target_symbol = s_with_usdt
-            break
-            
-    # Nếu có symbol, thực hiện phân tích kỹ thuật
-    technical_analysis_summary = "No specific coin mentioned for technical analysis."
+    # 5. Perform Technical Analysis if a specific coin is targeted
+    technical_analysis_summary = "No specific coin was targeted for technical analysis."
     if target_symbol:
         df_history = get_historical_data_from_hbase(target_symbol, limit=50)
         if df_history is not None and not df_history.empty and len(df_history) > 20:
@@ -620,12 +548,24 @@ What would you like to know about the crypto market today?"""
 - **Recent Low (Support):** ${df_history['low'].min():.4f}
 """
 
+    # 6. Generate the Final Prompt for the AI
+    prompt = ""
+    language_instruction = f"You MUST formulate your entire response in {user_language}."
+
+    additional_instruction = ""
+    if intent == "crypto_question" and crypto_question_part.strip() != user_question.strip():
+        additional_instruction = f"""
+        ---
+        IMPORTANT FINAL INSTRUCTION: The user's original question was "{user_question}". You have correctly focused on analyzing the crypto-related part. After providing your full, comprehensive analysis, you MUST add a concluding sentence at the very end. This sentence should politely state that the other topics in their original question are outside your expertise as a crypto analyst.
+        """
+
     # Tạo Prompt cho Gemini
     if has_relevant_news:
         # Nếu CÓ tin-tức, dùng prompt đầy-đủ
         print("[CHATBOT] Found relevant news. Using full prompt.")
         prompt = f"""
         You are an expert crypto market analyst. Your analysis must be technical and data-driven.
+        {language_instruction}
         Based on the following news, overall market snapshot, and specific technical indicators (if available), answer the user's question.
         Present the data and analysis objectively and finally may give direct financial advice (e.g., "you should buy/sell") if justified by the data.
         When you use information from a news article, you MUST note the article at the end of your response.
@@ -644,6 +584,8 @@ What would you like to know about the crypto market today?"""
         ### Sources
         1. [Publication Date][Full Title of Article 1](http://...)
         2. [Publication Date][Full Title of Article 2](http://...)
+
+        Note : If there is no relevant news, do NOT create any ### Sources section or add links.
         ---
         
         --- Previous Conversation History ---
@@ -665,7 +607,9 @@ What would you like to know about the crypto market today?"""
         {sources_list_markdown}
         --- End of Sources ---
 
-        **User's Question:** {user_question}
+        **User's Question:** {crypto_question_part}
+
+        {additional_instruction}
 
         **Your Expert Answer:**
         """
@@ -674,6 +618,7 @@ What would you like to know about the crypto market today?"""
         print("[CHATBOT] No relevant news found. Using technical-only prompt.")
         prompt = f"""
         You are an expert crypto market analyst. Your analysis must be technical and data-driven.
+        {language_instruction}
         Based on the overall market snapshot, and specific technical indicators (if available), answer the user's question.
         Present the data and analysis objectively and finally may give direct financial advice (e.g., "you should buy/sell") if justified by the data.
         Answer in the same language as the user's question.
@@ -696,23 +641,24 @@ What would you like to know about the crypto market today?"""
         {technical_analysis_summary}
         ---
 
-        **User's Question:** {user_question}
+        **User's Question:** {crypto_question_part}
+
+        {additional_instruction}
+
         **Your Expert Answer:**
         """
-    # ==============================================
-    # 6. Gọi Gemini API và trả lời
+
+    # 7. Call Gemini API and return the answer
     try:
         response = model.generate_content(prompt)
-        answer = response.text
+        final_answer = response.text
         
-        # Store the conversation in chat history
-        add_to_chat_history(session_id, user_question, answer)
+        add_to_chat_history(session_id, user_question, final_answer, user_mood)
         
-        return jsonify({"answer": answer})
+        return jsonify({"answer": final_answer})
     except Exception as e:
-        print(f"Lỗi khi gọi Gemini API: {e}")
+        print(f"Error calling Gemini API: {e}")
         return jsonify({"error": f"Error generating response from AI: {e}"}), 500
-
 
 @app.route("/api/chatbot/history", methods=["GET"])
 def get_chat_history():

@@ -9,3 +9,4 @@ pymongo
 pandas
 trafilatura
 lxml_html_clean
+packaging
