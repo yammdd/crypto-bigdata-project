@@ -110,13 +110,12 @@ h1 {
   display: inline-block;
 }
 
-/* --- PHẦN CSS CHATBOT GIỮ NGUYÊN --- */
 .chat-container {
   position: fixed;
   bottom: 20px;
   right: 20px;
-  width: 450px;
-  height: 700px;
+  width: 360px;
+  height: 550px;
   background: radial-gradient(circle at top left, rgba(25, 35, 60, 0.9), rgba(15, 20, 35, 0.95));
   border-radius: 10px;
   box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
@@ -178,6 +177,15 @@ h1 {
   overflow-wrap: break-word;
   word-break: break-word;
 }
+
+.chat-container a {
+  color: #85C7FF;
+  text-decoration: none; 
+}
+
+.chat-container a:hover {
+  text-decoration: underline;
+}  
 
 .loading-message .dot-flashing {
   position: relative;
