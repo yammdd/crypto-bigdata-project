@@ -536,7 +536,7 @@ with tabs[4]:
     # Create subplot for moving averages
     fig_ma = make_subplots(rows=2, cols=1, 
                           subplot_titles=('Price vs Moving Averages', 'MA Ratios Analysis'),
-                          vertical_spacing=0.1)
+                          vertical_spacing=0.22)
     
     # Price vs MAs
     for symbol in df['symbol'].unique():
