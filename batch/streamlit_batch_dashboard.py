@@ -123,7 +123,7 @@ st.markdown("""
 # Main header
 st.markdown("""
 <div class="main-header">
-    <h1>🚀 Crypto Intelligence Dashboard</h1>
+    <h1> Crypto Intelligence Dashboard</h1>
     <p>Advanced ML Predictions & Market Analytics</p>
 </div>
 """, unsafe_allow_html=True)
@@ -226,7 +226,7 @@ df['ma_14_30_ratio'] = df['ma_14d'] / df['ma_30d']
 df['ma_30_90_ratio'] = df['ma_30d'] / df['ma_90d']
 
 # Key Performance Indicators
-st.markdown("## 📊 Key Performance Indicators")
+st.markdown("## Key Performance Indicators")
 kpi1, kpi2, kpi3, kpi4 = st.columns(4)
 
 with kpi1:
