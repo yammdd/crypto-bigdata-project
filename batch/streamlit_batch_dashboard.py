@@ -133,12 +133,12 @@ st.sidebar.markdown("## 🎛️ Dashboard Controls")
 st.sidebar.markdown("---")
 
 # Refresh controls
-if st.sidebar.button("🔄 Refresh Data", type="primary", use_container_width=True):
+if st.sidebar.button("Refresh Data", type="primary", use_container_width=True):
         st.cache_data.clear()
         st.rerun()
 
 # Filter options
-st.sidebar.markdown("### 📊 Filter Options")
+st.sidebar.markdown("### Filter Options")
 confidence_filter = st.sidebar.selectbox(
     "Prediction Confidence",
     ["All", "High", "Medium", "Low"],
@@ -151,13 +151,13 @@ volatility_filter = st.sidebar.selectbox(
     index=0
 )
 
-# Data source info
+# Data source info, adjusted timezone GMT +7
 st.sidebar.markdown("---")
-st.sidebar.markdown("### 📡 Data Sources")
+st.sidebar.markdown("### Data Sources")
 st.sidebar.markdown("• **MongoDB**: Batch predictions")
 st.sidebar.markdown("• **HDFS**: Historical data")
 st.sidebar.markdown("• **Yahoo Finance**: Market data")
-st.sidebar.markdown(f"• **Last updated**: {pd.Timestamp.now().strftime('%H:%M:%S')}")
+st.sidebar.markdown(f"• **Last updated**: {pd.Timestamp.now('Asia/Bangkok').strftime('%H:%M:%S')}")
 
 # MongoDB connection with error handling
 @st.cache_data(ttl=10)  # Cache for only 10 seconds
@@ -202,12 +202,12 @@ if volatility_filter != "All":
 #         df[c] = np.clip(df[c], 0, np.percentile(df[c], 95))
 
 # Debug: Print available columns
-st.sidebar.markdown("---")
-st.sidebar.markdown("### 🔍 Debug Info")
-st.sidebar.write(f"**Available columns:** {len(df.columns)}")
-st.sidebar.write(f"**Data shape:** {df.shape}")
-if st.sidebar.checkbox("Show column names"):
-    st.sidebar.write(list(df.columns))
+# st.sidebar.markdown("---")
+# st.sidebar.markdown("### 🔍 Debug Info")
+# st.sidebar.write(f"**Available columns:** {len(df.columns)}")
+# st.sidebar.write(f"**Data shape:** {df.shape}")
+# if st.sidebar.checkbox("Show column names"):
+#     st.sidebar.write(list(df.columns))
 
 # Calculate key metrics
 total_market_cap = (df['predicted_price'] * df['volume']).sum()
@@ -267,7 +267,7 @@ st.markdown("---")
 tabs = st.tabs(["🎯 Predictions Overview", "📈 Price Analysis", "🔍 Risk Assessment", "🤖 Model Performance", "💼 Portfolio Insights", "📊 Raw Data"])
 
 with tabs[0]:
-    st.markdown("### 🎯 Prediction Overview")
+    st.markdown("### Prediction Overview")
     
     # Prediction confidence distribution
     col1, col2 = st.columns(2)
@@ -304,7 +304,7 @@ with tabs[0]:
         st.plotly_chart(fig_pred, use_container_width=True)
     
     # Top predictions table
-    st.markdown("### 🏆 Top Predictions")
+    st.markdown("### Top Predictions")
     top_predictions = df.nlargest(5, 'prediction_change_pct')[['symbol', 'last_price', 'predicted_price', 
                                                               'prediction_change_pct', 'prediction_confidence', 
                                                               'confidence_score']].copy()
@@ -313,7 +313,7 @@ with tabs[0]:
     st.dataframe(top_predictions, use_container_width=True)
 
 with tabs[1]:
-    st.markdown("### 📈 Price Analysis")
+    st.markdown("### Price Analysis")
     
     # Price comparison chart
     fig_price = go.Figure()
@@ -371,7 +371,7 @@ with tabs[1]:
         st.plotly_chart(fig_vol, use_container_width=True)
 
 with tabs[2]:
-    st.markdown("### 🔍 Risk Assessment")
+    st.markdown("### Risk Assessment")
     
     # Risk metrics
     risk_col1, risk_col2, risk_col3 = st.columns(3)
@@ -411,7 +411,7 @@ with tabs[2]:
     st.plotly_chart(fig_risk, use_container_width=True)
     
     # Correlation matrix
-    st.markdown("#### 📊 Feature Correlation Matrix")
+    st.markdown("#### Feature Correlation Matrix")
     numeric_cols = df.select_dtypes(include=[np.number]).columns
     
     if len(numeric_cols) > 1:
@@ -427,7 +427,7 @@ with tabs[2]:
         st.warning("Not enough numeric columns for correlation analysis")
 
 with tabs[3]:
-    st.markdown("### 🤖 Model Performance")
+    st.markdown("### Model Performance")
     
     # Model metrics
     perf_col1, perf_col2, perf_col3 = st.columns(3)
@@ -474,10 +474,10 @@ with tabs[3]:
     st.plotly_chart(fig_perf_conf, use_container_width=True)
 
 with tabs[4]:
-    st.markdown("### 💼 Portfolio Insights")
+    st.markdown("### Portfolio Insights")
     
     # Portfolio allocation recommendations
-    st.markdown("#### 🎯 Recommended Portfolio Allocation")
+    st.markdown("#### Recommended Portfolio Allocation")
     
     # Calculate portfolio weights based on confidence and expected returns
     df_portfolio = df.copy()
@@ -515,7 +515,7 @@ with tabs[4]:
     st.plotly_chart(fig_risk_return, use_container_width=True)
     
     # Trend Analysis Section
-    st.markdown("#### 📈 Trend Analysis & Momentum Indicators")
+    st.markdown("#### Trend Analysis & Momentum Indicators")
     
     # Calculate trend indicators
     df_trend = df.copy()
@@ -531,7 +531,7 @@ with tabs[4]:
     st.plotly_chart(fig_trend, use_container_width=True)
     
     # Moving averages analysis
-    st.markdown("#### 📊 Moving Averages Analysis")
+    st.markdown("#### Moving Averages Analysis")
     
     # Create subplot for moving averages
     fig_ma = make_subplots(rows=2, cols=1, 
@@ -572,10 +572,10 @@ with tabs[4]:
         st.plotly_chart(fig_ma2, use_container_width=True)
 
 with tabs[5]:
-    st.markdown("### 📊 Raw Data & System Health")
+    st.markdown("### Raw Data & System Health")
     
     # System Health Monitoring
-    st.markdown("#### 🏥 System Health Dashboard")
+    st.markdown("#### System Health Dashboard")
     
     health_col1, health_col2, health_col3, health_col4 = st.columns(4)
     
@@ -601,7 +601,7 @@ with tabs[5]:
         st.metric("System Status", system_status)
     
     # Data Quality Metrics
-    st.markdown("#### 📈 Data Quality Metrics")
+    st.markdown("#### Data Quality Metrics")
     
     quality_col1, quality_col2 = st.columns(2)
     
@@ -625,7 +625,7 @@ with tabs[5]:
         st.plotly_chart(fig_dist, use_container_width=True)
     
     # Data summary
-    st.markdown("#### 📈 Data Summary")
+    st.markdown("#### Data Summary")
     st.write(f"**Total Records:** {len(df)}")
     st.write(f"**Available Cryptocurrencies:** {', '.join(df['symbol'].unique())}")
     st.write(f"**Data Points per Symbol:** {len(df) // len(df['symbol'].unique()) if len(df) > 0 else 0}")
@@ -633,7 +633,7 @@ with tabs[5]:
     st.write(f"**High Confidence Predictions:** {len(df[df['prediction_confidence'] == 'high'])}")
     
     # Technical indicators summary
-    st.markdown("#### 🔧 Technical Indicators Summary")
+    st.markdown("#### Technical Indicators Summary")
     
     tech_indicators = ['rsi', 'macd', 'bb_position', 'bb_width', 'momentum_5d', 'momentum_10d', 'momentum_20d']
     # Filter to only include columns that exist in the dataframe
@@ -646,7 +646,7 @@ with tabs[5]:
         st.warning("No technical indicators available in the data")
     
     # Full dataset
-    st.markdown("#### 🔍 Complete Dataset")
+    st.markdown("#### Complete Dataset")
     
     # Add search and filter options
     search_symbol = st.text_input("🔍 Search by Symbol:", placeholder="e.g., BTC, ETH")
@@ -658,7 +658,7 @@ with tabs[5]:
     st.dataframe(df_filtered, use_container_width=True)
     
     # Download options
-    st.markdown("#### 📥 Data Export")
+    st.markdown("#### Data Export")
     col1, col2 = st.columns(2)
     
     with col1:
@@ -682,7 +682,7 @@ with tabs[5]:
         )
     
     # System recommendations
-    st.markdown("#### 💡 System Recommendations")
+    st.markdown("#### System Recommendations")
     
     recommendations = []
     
