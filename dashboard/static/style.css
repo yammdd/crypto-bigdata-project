@@ -1,6 +1,6 @@
 body {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  margin: 20px;
+  margin: 15px;
   background: #0b1221;
   color: #e6e8eb;
 }
@@ -8,12 +8,12 @@ body {
 h1 {
   text-align: center;
   color: #e6e8eb;
-  margin-bottom: 30px;
+  margin-bottom: 20px;
 }
 
 .crypto-container {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 20px;
   justify-content: center;
 }
@@ -21,54 +21,101 @@ h1 {
 .crypto-card {
   background: radial-gradient(circle at top left, rgba(25, 35, 60, 0.9), rgba(15, 20, 35, 0.95));
   border-radius: 10px;
-  padding: 20px;
+  padding: 15px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   transition: transform 0.2s;
+  display: flex;
+  flex-direction: column;
 }
 
 .crypto-card:hover {
-  transform: scale(1.03);
+  transform: translateY(-5px);
 }
 
-.crypto-card h2 {
-  margin-top: 0;
+.card-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.crypto-icon {
+  width: 35px;
+  height: 35px;
+  margin-right: 12px;
+  border-radius: 50%;
+}
+
+.card-header h2 {
+  margin: 0;
+  font-size: 1.15em;
   color: #f5f7fa;
 }
 
-.crypto-details p {
-  margin: 4px 0;
-  font-size: 14px;
+.card-body {
+  flex-grow: 1;
+}
+
+.card-body p {
+  margin: 2px 0;
+}
+
+.price-wrapper {
+  display: flex;
+  align-items: baseline;
+  margin-bottom: 10px;
+}
+
+.price-large {
+  font-size: 1.9em;
+  font-weight: 600;
+  margin: 0;
+}
+
+.price-change-pct {
+  margin-left: 10px;
+  font-size: 0.95em;
+  font-weight: 600;
+}
+
+.info-line {
+  color: #a9b1bd;
+  font-size: 0.85em;
+  margin-top: 8px;
+}
+
+.info-line .value {
+  color: #e6e8eb;
+  font-family: "Bahnschrift Light", "Bahnschrift", sans-serif;
 }
 
 .prediction {
-  margin-top: 10px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
   font-weight: bold;
   color: #4fd1c5;
 }
 
 .price-up {
   color: #16c784 !important;
-  font-weight: bold;
   transition: color 0.3s ease-in-out;
 }
 
 .price-down {
   color: #ea3943 !important;
-  font-weight: bold;
   transition: color 0.3s ease-in-out;
 }
 
 .value {
   display: inline-block;
-  min-width: 50px;
 }
 
 .chat-container {
   position: fixed;
   bottom: 20px;
   right: 20px;
-  width: 450px;
-  height: 700px;
+  width: 360px;
+  height: 550px;
   background: radial-gradient(circle at top left, rgba(25, 35, 60, 0.9), rgba(15, 20, 35, 0.95));
   border-radius: 10px;
   box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
@@ -115,29 +162,6 @@ h1 {
     margin: 0;
 }
 
-.bot-message ul {
-  padding-left: 20px;
-  margin-top: 5px;
-  margin-bottom: 5px;
-}
-
-.bot-message li {
-  margin-bottom: 4px;
-}
-
-.bot-message a {
-  color: #58a6ff;
-  text-decoration: none;
-}
-
-.bot-message a:hover {
-  text-decoration: underline;
-}
-
-.bot-message strong {
-    color: #f0f0f0;
-}    
-
 .user-message {
   background-color: #007aff;
   color: white;
@@ -154,9 +178,14 @@ h1 {
   word-break: break-word;
 }
 
-.loading-message {
-    align-self: flex-start;
+.chat-container a {
+  color: #85C7FF;
+  text-decoration: none; 
 }
+
+.chat-container a:hover {
+  text-decoration: underline;
+}  
 
 .loading-message .dot-flashing {
   position: relative;
@@ -199,13 +228,8 @@ h1 {
 }
 
 @keyframes dotFlashing {
-  0% {
-    background-color: #58a6ff;
-  }
-  50%,
-  100% {
-    background-color: #007aff;
-  }
+  0% { background-color: #58a6ff; }
+  50%, 100% { background-color: #007aff; }
 }
 
 .chat-input-form {
@@ -251,8 +275,7 @@ h1 {
 .chat-container.minimized {
   width: 60px;
   height: 60px;
-  border-radius: 50%; 
-  
+  border-radius: 50%;
   overflow: visible;
 }
 
@@ -272,9 +295,7 @@ h1 {
 .chat-container.minimized .chat-toggle-btn {
   width: 100%;
   height: 100%;
-  
   font-size: 0;
-  
   background-image: url('/static/bot-icon.png');
   background-size: 65%;
   background-repeat: no-repeat;
