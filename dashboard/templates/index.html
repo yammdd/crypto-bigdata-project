@@ -7,9 +7,15 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <link rel="stylesheet" href="/static/style.css" />
 </head>
-<body>
+<body class="dark-mode">
   <h1>Crypto Realtime Dashboard</h1>
+
+  <div class="theme-switch-wrapper">
+    <button id="theme-toggle-btn" aria-label="Toggle Theme"></button>
+  </div>
+
   <div id="crypto-container" class="crypto-container"></div>
+  
   <div class="chat-container">
     <div class="chat-header">
       <h3>AI Market Analyst</h3>
@@ -27,7 +33,8 @@
       </form>
     </div>
   </div>
-  <script src="/static/script.js"></script>
+  
+  <script src="/static/script.js?v=1.2"></script> <!-- Đổi version để chống cache -->
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </body>
 </html>

@@ -218,69 +218,93 @@ function main() {
 main();
 
 document.addEventListener('DOMContentLoaded', (event) => {
+  // --- CHATBOT ---
   const chatForm = document.getElementById('chat-form');
   const userInput = document.getElementById('user-input');
   const chatMessages = document.getElementById('chat-messages');
   const chatContainer = document.querySelector('.chat-container');
   const toggleChatBtn = document.getElementById('toggle-chat-btn');
 
-  if (!chatForm || !userInput || !chatMessages || !chatContainer || !toggleChatBtn) {
-    return;
-  }
-  chatContainer.classList.add('minimized');
-  toggleChatBtn.textContent = '';
+  if (chatForm && userInput && chatMessages && chatContainer && toggleChatBtn) {
+    chatContainer.classList.add('minimized');
+    toggleChatBtn.textContent = '';
+    
+    toggleChatBtn.addEventListener('click', () => {
+      chatContainer.classList.toggle('minimized');
+      toggleChatBtn.textContent = chatContainer.classList.contains('minimized') ? '' : '-';
+    });
   
-  toggleChatBtn.addEventListener('click', () => {
-    chatContainer.classList.toggle('minimized');
-    toggleChatBtn.textContent = chatContainer.classList.contains('minimized') ? '' : '-';
-  });
+    function addMessage(text, sender) {
+      const loading = document.querySelector('.loading-message');
+      if (loading) loading.remove();
+      const messageElement = document.createElement('div');
+      messageElement.classList.add('message', `${sender}-message`);
+      if (sender === 'bot') {
+        messageElement.innerHTML = typeof marked !== 'undefined' ? marked.parse(text) : text;
+      } else {
+        const p = document.createElement('p');
+        p.textContent = text;
+        messageElement.appendChild(p);
+      }
+      chatMessages.appendChild(messageElement);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+  
+    function showLoadingIndicator() {
+      const loadingElement = document.createElement('div');
+      loadingElement.classList.add('message', 'bot-message', 'loading-message');
+      const flashingDot = document.createElement('div');
+      flashingDot.classList.add('dot-flashing');
+      loadingElement.appendChild(flashingDot);
+      chatMessages.appendChild(loadingElement);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+  
+    async function handleFormSubmit(e) {
+      e.preventDefault();
+      const userText = userInput.value.trim();
+      if (!userText) return;
+      addMessage(userText, 'user');
+      userInput.value = '';
+      showLoadingIndicator();
+      try {
+        const res = await fetch('/api/chatbot/ask', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ question: userText }),
+        });
+        if (!res.ok) throw new Error(`Server responded with status: ${res.status}`);
+        const data = await res.json();
+        addMessage(data.answer || data.error || "Sorry, I couldn't get a response.", 'bot');
+      } catch (error) {
+        addMessage("Rất tiếc, tôi đang gặp sự cố kết nối. Vui lòng thử lại sau.", 'bot');
+      }
+    }
+  
+    chatForm.addEventListener('submit', handleFormSubmit);
+  }
 
-  function addMessage(text, sender) {
-    const loading = document.querySelector('.loading-message');
-    if (loading) loading.remove();
-    const messageElement = document.createElement('div');
-    messageElement.classList.add('message', `${sender}-message`);
-    if (sender === 'bot') {
-      messageElement.innerHTML = typeof marked !== 'undefined' ? marked.parse(text) : text;
+  const themeToggleBtn = document.getElementById('theme-toggle-btn');
+  const body = document.body;
+  
+  function applyTheme(theme) {
+    if (theme === 'light') {
+        body.classList.add('light-mode');
+        body.classList.remove('dark-mode');
     } else {
-      const p = document.createElement('p');
-      p.textContent = text;
-      messageElement.appendChild(p);
-    }
-    chatMessages.appendChild(messageElement);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
-  }
-
-  function showLoadingIndicator() {
-    const loadingElement = document.createElement('div');
-    loadingElement.classList.add('message', 'bot-message', 'loading-message');
-    const flashingDot = document.createElement('div');
-    flashingDot.classList.add('dot-flashing');
-    loadingElement.appendChild(flashingDot);
-    chatMessages.appendChild(loadingElement);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
-  }
-
-  async function handleFormSubmit(e) {
-    e.preventDefault();
-    const userText = userInput.value.trim();
-    if (!userText) return;
-    addMessage(userText, 'user');
-    userInput.value = '';
-    showLoadingIndicator();
-    try {
-      const res = await fetch('/api/chatbot/ask', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question: userText }),
-      });
-      if (!res.ok) throw new Error(`Server responded with status: ${res.status}`);
-      const data = await res.json();
-      addMessage(data.answer || data.error || "Sorry, I couldn't get a response.", 'bot');
-    } catch (error) {
-      addMessage("Rất tiếc, tôi đang gặp sự cố kết nối. Vui lòng thử lại sau.", 'bot');
+        body.classList.add('dark-mode');
+        body.classList.remove('light-mode');
     }
   }
 
-  chatForm.addEventListener('submit', handleFormSubmit);
+  const savedTheme = localStorage.getItem('theme') || 'dark';
+  applyTheme(savedTheme);
+
+  if (themeToggleBtn) {
+    themeToggleBtn.addEventListener('click', () => {
+      const newTheme = body.classList.contains('dark-mode') ? 'light' : 'dark';
+      localStorage.setItem('theme', newTheme);
+      applyTheme(newTheme);
+    });
+  }
 });
