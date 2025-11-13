@@ -1,14 +1,88 @@
+:root {
+  --body-bg: #0b1221;
+  --text-color: #e6e8eb;
+  --card-bg: radial-gradient(circle at top left, rgba(25, 35, 60, 0.9), rgba(15, 20, 35, 0.95));
+  --card-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  --card-header-text: #f5f7fa;
+  --price-large-text: var(--text-color);
+  --info-line-text: #a9b1bd;
+  --info-line-value-text: #e6e8eb;
+  --prediction-text: #4fd1c5;
+  --card-border-top: 1px solid rgba(255, 255, 255, 0.1);
+  --chat-bg: rgba(15, 20, 35, 0.85);
+  --chat-header-bg: rgba(25, 35, 60, 0.75);
+  --chat-border: rgba(68, 68, 68, 0.5);
+  --bot-message-bg: rgba(25, 35, 60, 0.9);
+  --bot-message-text: #f2f2f7;
+  --user-input-bg: rgba(15, 20, 35, 0.95);
+  --user-input-text: white;
+}
+
+body.light-mode {
+  --body-bg: #f0f2f5;
+  --text-color: #1c1e21;
+  --card-bg: #ffffff;
+  --card-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  --card-header-text: #050505;
+  --price-large-text: var(--text-color);
+  --info-line-text: #606770;
+  --info-line-value-text: #1c1e21;
+  --prediction-text: #6a82fb;
+  --card-border-top: 1px solid #e0e0e0;
+
+  --chat-bg: rgba(255, 255, 255, 0.8);
+  --chat-header-bg: rgba(240, 242, 245, 0.7);
+  --chat-border: rgba(220, 223, 227, 0.7);
+  --bot-message-bg: #e9ebee;
+  --bot-message-text: #1c1e21;
+  --user-input-bg: #e9ebee;
+  --user-input-text: #1c1e21;
+}
+
 body {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   margin: 15px;
-  background: #0b1221;
-  color: #e6e8eb;
+  background: var(--body-bg);
+  color: var(--text-color);
+  transition: background-color 0.3s, color 0.3s;
 }
 
 h1 {
   text-align: center;
-  color: #e6e8eb;
+  color: var(--text-color);
   margin-bottom: 20px;
+}
+
+.theme-switch-wrapper {
+  position: absolute;
+  top: 20px;
+  right: 25px;
+}
+
+#theme-toggle-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: cover;
+  transition: transform 0.2s;
+}
+
+#theme-toggle-btn:hover {
+  transform: scale(1.1);
+}
+
+body.dark-mode #theme-toggle-btn {
+  background-image: url('/static/icons/moon.png');
+}
+
+body.light-mode #theme-toggle-btn {
+  background-image: url('/static/icons/sun.png');
 }
 
 .crypto-container {
@@ -19,11 +93,11 @@ h1 {
 }
 
 .crypto-card {
-  background: radial-gradient(circle at top left, rgba(25, 35, 60, 0.9), rgba(15, 20, 35, 0.95));
+  background: var(--card-bg);
   border-radius: 10px;
   padding: 15px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  transition: transform 0.2s;
+  box-shadow: var(--card-shadow);
+  transition: transform 0.2s, background 0.3s;
   display: flex;
   flex-direction: column;
 }
@@ -48,7 +122,7 @@ h1 {
 .card-header h2 {
   margin: 0;
   font-size: 1.15em;
-  color: #f5f7fa;
+  color: var(--card-header-text);
 }
 
 .card-body {
@@ -69,6 +143,7 @@ h1 {
   font-size: 1.9em;
   font-weight: 600;
   margin: 0;
+  color: var(--price-large-text);
 }
 
 .price-change-pct {
@@ -78,22 +153,22 @@ h1 {
 }
 
 .info-line {
-  color: #a9b1bd;
+  color: var(--info-line-text);
   font-size: 0.85em;
   margin-top: 8px;
 }
 
 .info-line .value {
-  color: #e6e8eb;
+  color: var(--info-line-value-text);
   font-family: "Bahnschrift Light", "Bahnschrift", sans-serif;
 }
 
 .prediction {
   margin-top: 12px;
   padding-top: 12px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: 1px solid var(--card-border-top);
   font-weight: bold;
-  color: #4fd1c5;
+  color: var(--prediction-text);
 }
 
 .price-up {
@@ -116,20 +191,21 @@ h1 {
   right: 20px;
   width: 360px;
   height: 550px;
-  background: radial-gradient(circle at top left, rgba(25, 35, 60, 0.9), rgba(15, 20, 35, 0.95));
+  background: var(--chat-bg);
   border-radius: 10px;
   box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
   display: flex;
   flex-direction: column;
   overflow: hidden;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  border: 1px solid var(--chat-border);
 }
 
 .chat-header {
-  background-color: rgba(25, 35, 60, 0.9);
+  background-color: var(--chat-header-bg);
   padding: 15px;
   text-align: center;
-  border-bottom: 1px solid #444;
+  border-bottom: 1px solid var(--chat-border);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -137,7 +213,7 @@ h1 {
 
 .chat-header h3 {
   margin: 0;
-  color: #f2f2f7;
+  color: var(--text-color);
   font-size: 16px;
 }
 
@@ -170,8 +246,8 @@ h1 {
 }
 
 .bot-message {
-  background-color: rgba(25, 35, 60, 0.9);
-  color: #f2f2f7;
+  background-color: var(--bot-message-bg);
+  color: var(--bot-message-text);
   align-self: flex-start;
   border-bottom-left-radius: 4px;
   overflow-wrap: break-word;
@@ -233,7 +309,7 @@ h1 {
 }
 
 .chat-input-form {
-  border-top: 1px solid #444;
+  border-top: 1px solid var(--chat-border);
   padding: 10px;
 }
 
@@ -246,8 +322,8 @@ h1 {
   border: none;
   padding: 10px;
   border-radius: 20px;
-  background-color: rgba(15, 20, 35, 0.95);
-  color: white;
+  background-color: var(--user-input-bg);
+  color: var(--user-input-text);
   outline: none;
 }
 
@@ -264,7 +340,7 @@ h1 {
 .chat-toggle-btn {
   background: none;
   border: none;
-  color: #f2f2f7;
+  color: var(--text-color);
   font-size: 24px;
   font-weight: bold;
   cursor: pointer;
@@ -300,4 +376,8 @@ h1 {
   background-size: 65%;
   background-repeat: no-repeat;
   background-position: center;
+}
+
+body.light-mode .chat-container.minimized .chat-toggle-btn {
+    background-image: url('/static/bot-icon-light.png');
 }
