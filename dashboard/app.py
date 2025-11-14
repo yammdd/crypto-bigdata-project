@@ -304,6 +304,48 @@ def get_crypto(symbol):
         print("[ERROR]", str(e))
         traceback.print_exc()
         return jsonify({"error": str(e)})
+    
+@app.route("/api/crypto/history/<string:symbol>", methods=["GET"])
+def get_crypto_history(symbol):
+    """
+    Lấy dữ liệu lịch sử giá của một loại tiền điện tử từ HBase.
+    Chỉ trả về timestamp và giá đóng (close price).
+    """
+    try:
+        connection = happybase.Connection(
+            host=os.getenv("HBASE_THRIFT_HOST", "hbase"),
+            port=int(os.getenv("HBASE_THRIFT_PORT", "9090"))
+        )
+        connection.open()
+        table = connection.table("crypto_prices")
+        
+        row_prefix = f"{symbol.strip().lower()}_".encode("utf-8")
+        
+        # Quét 1000 dòng gần nhất để có đủ dữ liệu vẽ biểu đồ
+        rows = table.scan(row_prefix=row_prefix, limit=1000)
+
+        result = []
+        for key, data in rows:
+            timestamp_str = key.decode().split('_')[1]
+            try:
+                timestamp = int(timestamp_str)
+                price = float(data.get(b'data:price', b'0').decode())
+                result.append({"timestamp": timestamp, "price": price})
+            except (ValueError, TypeError):
+                # Bỏ qua các hàng không hợp lệ
+                continue
+        
+        connection.close()
+
+        # Sắp xếp dữ liệu theo timestamp tăng dần
+        result.sort(key=lambda x: x['timestamp'])
+
+        return jsonify(result) if result else jsonify({"message": f"No historical data for {symbol}"})
+
+    except Exception as e:
+        print(f"[ERROR] Lỗi khi lấy dữ liệu lịch sử cho {symbol}: {e}")
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/api/crypto/predictions/<string:symbol>", methods=["GET"])
 def predict_realtime(symbol):

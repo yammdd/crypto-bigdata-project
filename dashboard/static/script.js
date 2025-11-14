@@ -11,6 +11,14 @@ const attrs = [
 const cards = {};
 const previousData = {};
 
+const charts = {};
+
+// Hàm hỗ trợ để định dạng timestamp thành chuỗi thời gian dễ đọc
+function formatTimestampToTime(timestamp) {
+  const date = new Date(timestamp * 1000); // timestamp từ HBase thường là giây
+  return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+}
+
 function createCard(symbol) {
   const baseAsset = symbol.replace('usdt', '');
 
@@ -114,30 +122,85 @@ function createCard(symbol) {
   drawChart(symbol);
 }
 
+// Sửa đổi hàm drawChart để khởi tạo và lưu trữ biểu đồ
 function drawChart(symbol) {
     const ctx = document.getElementById(`${symbol}-chart`).getContext('2d');
-    new Chart(ctx, {
+    charts[symbol] = new Chart(ctx, {
         type: 'line',
         data: {
-            labels: ['1', '2', '3', '4', '5', '6', '7'],
+            labels: [], // Sẽ được điền bởi dữ liệu lịch sử
             datasets: [{
-                label: 'Price History',
-                data: [65, 59, 80, 81, 56, 55, 40],
+                label: `${symbol.toUpperCase()} Price`,
+                data: [], // Sẽ được điền bởi dữ liệu lịch sử
                 fill: false,
                 borderColor: 'rgb(75, 192, 192)',
-                tension: 0.1
+                tension: 0.1,
+                pointRadius: 0 // Ẩn các điểm dữ liệu
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
+            plugins: {
+                legend: {
+                    display: true, // Hiển thị legend
+                    labels: {
+                        color: 'white' // Màu chữ legend
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.dataset.label || '';
+                            if (label) {
+                                label += ': ';
+                            }
+                            if (context.parsed.y !== null) {
+                                label += formatPrice(context.parsed.y);
+                            }
+                            return label;
+                        }
+                    }
+                }
+            },
             scales: {
-                x: { ticks: { color: 'grey' } },
-                y: { ticks: { color: 'grey' } }
+                x: {
+                    ticks: { color: 'grey' },
+                    grid: { color: 'rgba(200, 200, 200, 0.1)' }
+                },
+                y: {
+                    ticks: {
+                        color: 'grey',
+                        callback: function(value, index, values) {
+                            return formatPrice(value); // Định dạng giá trên trục y
+                        }
+                    },
+                    grid: { color: 'rgba(200, 200, 200, 0.1)' }
+                }
             }
         }
     });
+}
+
+// Hàm mới để cập nhật biểu đồ với dữ liệu lịch sử và real-time
+async function updateChartData(symbol) {
+    try {
+        const res = await fetch(`/api/crypto/history/${symbol}`);
+        const historicalData = await res.json();
+
+        if (historicalData && historicalData.length > 0) {
+            const labels = historicalData.map(d => formatTimestampToTime(d.timestamp));
+            const dataPoints = historicalData.map(d => d.price);
+
+            if (charts[symbol]) {
+                charts[symbol].data.labels = labels;
+                charts[symbol].data.datasets[0].data = dataPoints;
+                charts[symbol].update();
+            }
+        }
+    } catch (err) {
+        console.error(`Error updating chart for ${symbol}:`, err);
+    }
 }
 
 function updateColor(element, newValue, oldValue) {
@@ -254,8 +317,12 @@ function main() {
     createCard(symbol);
     updateLive(symbol);
     updatePrediction(symbol);
-    setInterval(() => updateLive(symbol), 2000);
-    setInterval(() => updatePrediction(symbol), 5000);
+    updateChartData(symbol); // Gọi hàm này để tải dữ liệu ban đầu cho biểu đồ
+
+    setInterval(() => updateLive(symbol), 3000);
+    setInterval(() => updatePrediction(symbol), 10000);
+    // Cập nhật biểu đồ thường xuyên hơn để giữ cho nó gần real-time
+    setInterval(() => updateChartData(symbol), 3000); // Cập nhật mỗi 3 giây
   });
 }
 
