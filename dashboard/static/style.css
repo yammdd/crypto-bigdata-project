@@ -29,7 +29,6 @@ body.light-mode {
   --info-line-value-text: #1c1e21;
   --prediction-text: #6a82fb;
   --card-border-top: 1px solid #e0e0e0;
-
   --chat-bg: rgba(255, 255, 255, 0.8);
   --chat-header-bg: rgba(240, 242, 245, 0.7);
   --chat-border: rgba(220, 223, 227, 0.7);
@@ -97,12 +96,12 @@ body.light-mode #theme-toggle-btn {
   border-radius: 10px;
   padding: 15px;
   box-shadow: var(--card-shadow);
-  transition: transform 0.2s, background 0.3s;
+  transition: background 0.3s;
   display: flex;
   flex-direction: column;
 }
 
-.crypto-card:hover {
+.crypto-card-container:hover .crypto-card {
   transform: translateY(-5px);
 }
 
@@ -380,4 +379,30 @@ body.light-mode #theme-toggle-btn {
 
 body.light-mode .chat-container.minimized .chat-toggle-btn {
     background-image: url('/static/bot-icon-light.png');
+}
+
+.hidden {
+  display: none !important;
+}
+
+.crypto-card-container {
+  cursor: pointer;
+  min-height: 275px;
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.2s;
+}
+
+.crypto-card-container:hover {
+  transform: translateY(-5px);
+}
+
+.crypto-card-container .crypto-card {
+    height: 100%;
+}
+
+.crypto-card-chart {
+    display: flex;
+    justify-content: center;
+    align-items: center;
 }

@@ -12,11 +12,14 @@ const cards = {};
 const previousData = {};
 
 function createCard(symbol) {
-  const card = document.createElement("div");
-  card.className = "crypto-card";
-  card.id = symbol;
-
   const baseAsset = symbol.replace('usdt', '');
+
+  const container = document.createElement("div");
+  container.className = "crypto-card-container";
+
+  const cardInfo = document.createElement("div");
+  cardInfo.className = "crypto-card";
+  cardInfo.id = symbol;
 
   const header = document.createElement("div");
   header.className = "card-header";
@@ -87,14 +90,55 @@ function createCard(symbol) {
   pred.id = `${symbol}_prediction`;
   pred.innerHTML = `Predicted Price: <span class="value">?</span>`;
 
-  card.appendChild(header);
-  card.appendChild(body);
-  card.appendChild(pred);
+  cardInfo.appendChild(header);
+  cardInfo.appendChild(body);
+  cardInfo.appendChild(pred);
 
-  document.getElementById("crypto-container").appendChild(card);
-  cards[symbol] = card;
+  const cardChart = document.createElement("div");
+  cardChart.className = "crypto-card crypto-card-chart hidden";
+  
+  const chartCanvas = document.createElement("canvas");
+  chartCanvas.id = `${symbol}-chart`;
+  cardChart.appendChild(chartCanvas);
+
+  container.appendChild(cardInfo);
+  container.appendChild(cardChart);
+
+  container.addEventListener('click', () => {
+    cardInfo.classList.toggle('hidden');
+    cardChart.classList.toggle('hidden');
+  });
+
+  document.getElementById("crypto-container").appendChild(container);
+  
+  drawChart(symbol);
 }
 
+function drawChart(symbol) {
+    const ctx = document.getElementById(`${symbol}-chart`).getContext('2d');
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: ['1', '2', '3', '4', '5', '6', '7'],
+            datasets: [{
+                label: 'Price History',
+                data: [65, 59, 80, 81, 56, 55, 40],
+                fill: false,
+                borderColor: 'rgb(75, 192, 192)',
+                tension: 0.1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { ticks: { color: 'grey' } },
+                y: { ticks: { color: 'grey' } }
+            }
+        }
+    });
+}
 
 function updateColor(element, newValue, oldValue) {
   if (element && !isNaN(newValue) && oldValue !== undefined && !isNaN(oldValue)) {
@@ -218,7 +262,6 @@ function main() {
 main();
 
 document.addEventListener('DOMContentLoaded', (event) => {
-  // --- CHATBOT ---
   const chatForm = document.getElementById('chat-form');
   const userInput = document.getElementById('user-input');
   const chatMessages = document.getElementById('chat-messages');
