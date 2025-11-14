@@ -210,7 +210,7 @@ if volatility_filter != "All":
 #     st.sidebar.write(list(df.columns))
 
 # Calculate key metrics
-total_market_cap = (df['predicted_price'] * df['volume']).sum()
+total_traded_value = (df['predicted_price'] * df['volume']).sum()
 best_performer = df.loc[df['prediction_change_pct'].idxmax()]
 worst_performer = df.loc[df['prediction_change_pct'].idxmin()]
 
@@ -232,8 +232,8 @@ kpi1, kpi2, kpi3, kpi4 = st.columns(4)
 with kpi1:
     st.markdown(f"""
     <div class="metric-card">
-        <div class="metric-value">${total_market_cap:,.0f}</div>
-        <div class="metric-label">Total Market Cap</div>
+        <div class="metric-value">${total_traded_value:,.0f}</div>
+        <div class="metric-label">Total Traded Value (across dataset period)</div>
     </div>
     """, unsafe_allow_html=True)
 
