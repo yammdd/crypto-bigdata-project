@@ -254,7 +254,7 @@ async function updateLive(symbol) {
       const pctChangeEl = document.querySelector(`#${symbol}_data_price_change_pct .value`);
       const priceChangeEl = document.querySelector(`#${symbol}_data_price_change .value`);
       const bidAskEl = document.querySelector(`#${symbol}_bid_ask .value`);
-      const spreadEl = document.querySelector(`#symbol}_spread .value`);
+      const spreadEl = document.querySelector(`#${symbol}_spread .value`);
       const volumeQuoteEl = document.querySelector(`#${symbol}_data_volume_quote .value`);
       const volumeTokenEl = document.querySelector(`#${symbol}_data_volume_token .value`);
       
