@@ -11,12 +11,26 @@ const attrs = [
 const cards = {};
 const previousData = {};
 
-function createCard(symbol) {
-  const card = document.createElement("div");
-  card.className = "crypto-card";
-  card.id = symbol;
+const charts = {};
 
+// Hàm hỗ trợ để định dạng timestamp thành chuỗi thời gian dễ đọc
+function formatTimestampToTime(timestamp) {
+  const date = new Date(timestamp * 1000); // timestamp từ HBase thường là giây
+  return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+}
+
+function createCard(symbol) {
   const baseAsset = symbol.replace('usdt', '');
+
+  const container = document.createElement("div");
+  container.className = "crypto-card-container";
+  
+  const flipper = document.createElement("div");
+  flipper.className = "flipper";
+
+  const cardInfo = document.createElement("div");
+  cardInfo.className = "crypto-card crypto-card-front";
+  cardInfo.id = symbol;
 
   const header = document.createElement("div");
   header.className = "card-header";
@@ -87,14 +101,115 @@ function createCard(symbol) {
   pred.id = `${symbol}_prediction`;
   pred.innerHTML = `Predicted Price: <span class="value">?</span>`;
 
-  card.appendChild(header);
-  card.appendChild(body);
-  card.appendChild(pred);
+  cardInfo.appendChild(header);
+  cardInfo.appendChild(body);
+  cardInfo.appendChild(pred);
 
-  document.getElementById("crypto-container").appendChild(card);
-  cards[symbol] = card;
+  const cardChart = document.createElement("div");
+  cardChart.className = "crypto-card crypto-card-chart crypto-card-back";
+  
+  const chartCanvas = document.createElement("canvas");
+  chartCanvas.id = `${symbol}-chart`;
+  cardChart.appendChild(chartCanvas);
+
+  flipper.appendChild(cardInfo);
+  flipper.appendChild(cardChart);
+  container.appendChild(flipper);
+
+  container.addEventListener('click', () => {
+    flipper.classList.toggle('is-flipped');
+  });
+
+  document.getElementById("crypto-container").appendChild(container);
+  
+  drawChart(symbol);
 }
 
+// Sửa đổi hàm drawChart để khởi tạo và lưu trữ biểu đồ
+function drawChart(symbol) {
+    const isLightMode = document.body.classList.contains('light-mode');
+    const legendColor = isLightMode ? '#1c1e21' : 'white';
+    const tickColor = isLightMode ? '#606770' : 'grey';
+    const gridColor = isLightMode ? 'rgba(0, 0, 0, 0.1)' : 'rgba(200, 200, 200, 0.1)';
+
+    const ctx = document.getElementById(`${symbol}-chart`).getContext('2d');
+    charts[symbol] = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: [], // Sẽ được điền bởi dữ liệu lịch sử
+            datasets: [{
+                label: `${symbol.toUpperCase()} Price`,
+                data: [], // Sẽ được điền bởi dữ liệu lịch sử
+                fill: false,
+                borderColor: 'rgb(75, 192, 192)',
+                tension: 0.1,
+                pointRadius: 0 // Ẩn các điểm dữ liệu
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: true, // Hiển thị legend
+                    labels: {
+                        color: legendColor // Màu chữ legend
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.dataset.label || '';
+                            if (label) {
+                                label += ': ';
+                            }
+                            if (context.parsed.y !== null) {
+                                label += formatPrice(context.parsed.y);
+                            }
+                            return label;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    ticks: { color: tickColor },
+                    grid: { color: gridColor }
+                },
+                y: {
+                    ticks: {
+                        color: tickColor,
+                        callback: function(value, index, values) {
+                            return formatPrice(value); // Định dạng giá trên trục y
+                        }
+                    },
+                    grid: { color: gridColor }
+                }
+            }
+        }
+    });
+}
+
+// Hàm mới để cập nhật biểu đồ với dữ liệu lịch sử và real-time
+async function updateChartData(symbol) {
+    try {
+        const res = await fetch(`/api/crypto/history/${symbol}`);
+        const historicalData = await res.json();
+
+        if (historicalData && historicalData.length > 0) {
+            const labels = historicalData.map(d => formatTimestampToTime(d.timestamp));
+            const dataPoints = historicalData.map(d => d.price);
+
+            if (charts[symbol]) {
+                charts[symbol].data.labels = labels;
+                charts[symbol].data.datasets[0].data = dataPoints;
+                charts[symbol].update('none'); // Cập nhật không có animation để mượt hơn
+            }
+        }
+    } catch (err) {
+        console.error(`Error updating chart for ${symbol}:`, err);
+    }
+}
 
 function updateColor(element, newValue, oldValue) {
   if (element && !isNaN(newValue) && oldValue !== undefined && !isNaN(oldValue)) {
@@ -210,15 +325,18 @@ function main() {
     createCard(symbol);
     updateLive(symbol);
     updatePrediction(symbol);
-    setInterval(() => updateLive(symbol), 2000);
-    setInterval(() => updatePrediction(symbol), 5000);
+    updateChartData(symbol); // Gọi hàm này để tải dữ liệu ban đầu cho biểu đồ
+
+    setInterval(() => updateLive(symbol), 3000);
+    setInterval(() => updatePrediction(symbol), 10000);
+    // Cập nhật biểu đồ thường xuyên hơn để giữ cho nó gần real-time
+    setInterval(() => updateChartData(symbol), 3000); // Cập nhật mỗi 3 giây
   });
 }
 
 main();
 
 document.addEventListener('DOMContentLoaded', (event) => {
-  // --- CHATBOT ---
   const chatForm = document.getElementById('chat-form');
   const userInput = document.getElementById('user-input');
   const chatMessages = document.getElementById('chat-messages');
@@ -295,6 +413,21 @@ document.addEventListener('DOMContentLoaded', (event) => {
         body.classList.add('dark-mode');
         body.classList.remove('light-mode');
     }
+
+    const isLight = theme === 'light';
+    const newLegendColor = isLight ? '#1c1e21' : 'white';
+    const newTickColor = isLight ? '#606770' : 'grey';
+    const newGridColor = isLight ? 'rgba(0, 0, 0, 0.1)' : 'rgba(200, 200, 200, 0.1)';
+
+    // Cập nhật màu sắc cho tất cả biểu đồ đang có
+    Object.values(charts).forEach(chart => {
+        chart.options.plugins.legend.labels.color = newLegendColor;
+        chart.options.scales.x.ticks.color = newTickColor;
+        chart.options.scales.y.ticks.color = newTickColor;
+        chart.options.scales.x.grid.color = newGridColor;
+        chart.options.scales.y.grid.color = newGridColor;
+        chart.update();
+    });
   }
 
   const savedTheme = localStorage.getItem('theme') || 'dark';
