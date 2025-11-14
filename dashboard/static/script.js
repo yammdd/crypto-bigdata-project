@@ -24,9 +24,12 @@ function createCard(symbol) {
 
   const container = document.createElement("div");
   container.className = "crypto-card-container";
+  
+  const flipper = document.createElement("div");
+  flipper.className = "flipper";
 
   const cardInfo = document.createElement("div");
-  cardInfo.className = "crypto-card";
+  cardInfo.className = "crypto-card crypto-card-front";
   cardInfo.id = symbol;
 
   const header = document.createElement("div");
@@ -103,18 +106,18 @@ function createCard(symbol) {
   cardInfo.appendChild(pred);
 
   const cardChart = document.createElement("div");
-  cardChart.className = "crypto-card crypto-card-chart hidden";
+  cardChart.className = "crypto-card crypto-card-chart crypto-card-back";
   
   const chartCanvas = document.createElement("canvas");
   chartCanvas.id = `${symbol}-chart`;
   cardChart.appendChild(chartCanvas);
 
-  container.appendChild(cardInfo);
-  container.appendChild(cardChart);
+  flipper.appendChild(cardInfo);
+  flipper.appendChild(cardChart);
+  container.appendChild(flipper);
 
   container.addEventListener('click', () => {
-    cardInfo.classList.toggle('hidden');
-    cardChart.classList.toggle('hidden');
+    flipper.classList.toggle('is-flipped');
   });
 
   document.getElementById("crypto-container").appendChild(container);
@@ -124,6 +127,11 @@ function createCard(symbol) {
 
 // Sửa đổi hàm drawChart để khởi tạo và lưu trữ biểu đồ
 function drawChart(symbol) {
+    const isLightMode = document.body.classList.contains('light-mode');
+    const legendColor = isLightMode ? '#1c1e21' : 'white';
+    const tickColor = isLightMode ? '#606770' : 'grey';
+    const gridColor = isLightMode ? 'rgba(0, 0, 0, 0.1)' : 'rgba(200, 200, 200, 0.1)';
+
     const ctx = document.getElementById(`${symbol}-chart`).getContext('2d');
     charts[symbol] = new Chart(ctx, {
         type: 'line',
@@ -145,7 +153,7 @@ function drawChart(symbol) {
                 legend: {
                     display: true, // Hiển thị legend
                     labels: {
-                        color: 'white' // Màu chữ legend
+                        color: legendColor // Màu chữ legend
                     }
                 },
                 tooltip: {
@@ -165,17 +173,17 @@ function drawChart(symbol) {
             },
             scales: {
                 x: {
-                    ticks: { color: 'grey' },
-                    grid: { color: 'rgba(200, 200, 200, 0.1)' }
+                    ticks: { color: tickColor },
+                    grid: { color: gridColor }
                 },
                 y: {
                     ticks: {
-                        color: 'grey',
+                        color: tickColor,
                         callback: function(value, index, values) {
                             return formatPrice(value); // Định dạng giá trên trục y
                         }
                     },
-                    grid: { color: 'rgba(200, 200, 200, 0.1)' }
+                    grid: { color: gridColor }
                 }
             }
         }
@@ -195,7 +203,7 @@ async function updateChartData(symbol) {
             if (charts[symbol]) {
                 charts[symbol].data.labels = labels;
                 charts[symbol].data.datasets[0].data = dataPoints;
-                charts[symbol].update();
+                charts[symbol].update('none'); // Cập nhật không có animation để mượt hơn
             }
         }
     } catch (err) {
@@ -246,7 +254,7 @@ async function updateLive(symbol) {
       const pctChangeEl = document.querySelector(`#${symbol}_data_price_change_pct .value`);
       const priceChangeEl = document.querySelector(`#${symbol}_data_price_change .value`);
       const bidAskEl = document.querySelector(`#${symbol}_bid_ask .value`);
-      const spreadEl = document.querySelector(`#${symbol}_spread .value`);
+      const spreadEl = document.querySelector(`#symbol}_spread .value`);
       const volumeQuoteEl = document.querySelector(`#${symbol}_data_volume_quote .value`);
       const volumeTokenEl = document.querySelector(`#${symbol}_data_volume_token .value`);
       
@@ -405,6 +413,21 @@ document.addEventListener('DOMContentLoaded', (event) => {
         body.classList.add('dark-mode');
         body.classList.remove('light-mode');
     }
+
+    const isLight = theme === 'light';
+    const newLegendColor = isLight ? '#1c1e21' : 'white';
+    const newTickColor = isLight ? '#606770' : 'grey';
+    const newGridColor = isLight ? 'rgba(0, 0, 0, 0.1)' : 'rgba(200, 200, 200, 0.1)';
+
+    // Cập nhật màu sắc cho tất cả biểu đồ đang có
+    Object.values(charts).forEach(chart => {
+        chart.options.plugins.legend.labels.color = newLegendColor;
+        chart.options.scales.x.ticks.color = newTickColor;
+        chart.options.scales.y.ticks.color = newTickColor;
+        chart.options.scales.x.grid.color = newGridColor;
+        chart.options.scales.y.grid.color = newGridColor;
+        chart.update();
+    });
   }
 
   const savedTheme = localStorage.getItem('theme') || 'dark';
