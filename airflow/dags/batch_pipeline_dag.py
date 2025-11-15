@@ -10,7 +10,7 @@ default_args = {
 with DAG(
     dag_id="batch_pipeline",
     default_args=default_args,
-    schedule_interval="@daily",
+    schedule_interval="@daily", # use @once if you want it to run immediately after it is built
     catchup=False,
 ) as dag:
 
