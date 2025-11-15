@@ -10,9 +10,9 @@ default_args = {
 with DAG(
     dag_id="batch_pipeline",
     default_args=default_args,
-    schedule_interval=None, # Chạy mỗi ngày một lần
-    catchup=False, # Không chạy lại các lượt chạy DAG trong quá khứ khi DAG được kích hoạt lần đầu
-    tags=['crypto', 'batch', 'spark'], # Thêm tags để dễ quản lý trong Airflow UI
+    schedule_interval=None, # use @once if you want it to run immediately after it is built, or @daily for daily
+    catchup=False, # use True if you want to run for all missed intervals
+    tags=['crypto', 'batch', 'spark']
 ) as dag:
 
     run_yahoo_producer = BashOperator(
