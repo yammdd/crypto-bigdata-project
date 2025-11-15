@@ -1,17 +1,18 @@
-from datetime import datetime, timedelta
-from dateutil.relativedelta import relativedelta
+# MODIFIED: Removed unnecessary imports for Yahoo Finance fetching (yfinance, dateutil.relativedelta)
+# MODIFIED: Added imports for Spark Kafka integration and JSON schema
+from datetime import datetime  # KEEP: Still needed for potential timestamps, though minimally used now
 from pyspark.sql import SparkSession
-import yfinance as yf
+from pyspark.sql.functions import col, from_json, to_timestamp  # NEW: For Kafka data parsing
+from pyspark.sql.types import StructType, StructField, StringType, DoubleType  # NEW: For defining JSON schema
 import pandas as pd
-import os
-from pyspark.ml.feature import VectorAssembler
+from pyspark.ml.feature import VectorAssembler  # KEEP: Original, though not used in provided code snippet
 import xgboost as xgb
 import json
 import joblib
 import numpy as np
 from sklearn.preprocessing import StandardScaler
 
-# Map Binance symbols to Yahoo Finance symbols
+# Map Binance symbols to Yahoo Finance symbols  # KEEP: Retained for consistency, though not used for fetching now
 symbol_map = {
     "btcusdt": "BTC-USD",
     "ethusdt": "ETH-USD",
@@ -25,74 +26,77 @@ symbol_map = {
     "ltcusdt": "LTC-USD" 
 }
 
-# Output HDFS path
+# Output HDFS path  # KEEP: Original
 output_dir = "hdfs://namenode:9000/crypto/yahoo"
 
-end_date = datetime.now()
-start_date = end_date - timedelta(days=365*2)  
+# MODIFIED: Removed end_date and start_date as no longer needed for monthly batch fetching
 
-# Initialize Spark
+# NEW: Define schema for Kafka JSON messages (matching producer output)
+kafka_schema = StructType([
+    StructField("datetime", StringType(), True),
+    StructField("open", DoubleType(), True),
+    StructField("high", DoubleType(), True),
+    StructField("low", DoubleType(), True),
+    StructField("close", DoubleType(), True),
+    StructField("volume", DoubleType(), True),
+    StructField("symbol_binance", StringType(), True),
+    StructField("interval", StringType(), True)
+])
+
+# Initialize Spark  # KEEP: Original
 spark = SparkSession.builder.appName("YahooFinanceBatch").getOrCreate()
 
-for symbol_binance, symbol_yahoo in symbol_map.items():
-    print(f"[INFO] Start fetching {symbol_yahoo}...")
-    monthly_dfs = []
+# MODIFIED: Replaced entire Yahoo fetching loop with Kafka consumption
+# NEW: Read from Kafka topic (assuming "crypto_prices_yahoo_daily" for daily data; adjust if needed for hourly)
+kafka_df = spark \
+    .read \
+    .format("kafka") \
+    .option("kafka.bootstrap.servers", "kafka:29092") \
+    .option("subscribe", "crypto_prices_yahoo_daily") \
+    .option("startingOffsets", "earliest") \
+    .option("endingOffsets", "latest") \
+    .load()
 
-    current = start_date
-    while current < end_date:
-        start = current
-        end = current + relativedelta(months=1)
-        print(f"[INFO] Fetching {symbol_yahoo}: {start.date()} -> {end.date()}")
+# Parse JSON value and convert datetime to timestamp
+parsed_df = kafka_df.select(
+    from_json(col("value").cast("string"), kafka_schema).alias("data")
+).select("data.*")
 
-        try:
-            df = yf.download(
-                symbol_yahoo,
-                start=start,
-                end=end,
-                interval="1d",  # Daily intervals for long-term analysis
-                progress=False,
-            )
-            if df.empty:
-                print(f"[WARN] No data for {symbol_yahoo} in {start.strftime('%Y-%m')}")
-                current += relativedelta(months=1)
-                continue
+# Convert datetime string to timestamp
+parsed_df = parsed_df.withColumn("datetime", to_timestamp(col("datetime")))
 
-            df.reset_index(inplace=True)
-            monthly_dfs.append(df)
-        except Exception as e:
-            print(f"[ERROR] Failed to fetch {symbol_yahoo} in {start.strftime('%Y-%m')}: {e}")
+# Filter and save per symbol to HDFS Parquet
+for symbol_binance in symbol_map.keys():  # KEEP: Iterate over symbols
+    print(f"[INFO] Start processing {symbol_binance} from Kafka...")
+    
+    try:
+        symbol_df = parsed_df.filter(col("symbol_binance") == symbol_binance)
         
-        current += relativedelta(months=1)
+        if symbol_df.count() == 0:
+            print(f"[WARN] No data for {symbol_binance} in Kafka topic")
+            continue
 
-    if not monthly_dfs:
-        print(f"[ERROR] No valid data for {symbol_binance} over all months.")
-        continue
+        # Sort by datetime to ensure order  # NEW: Added for consistency with original sorted data
+        symbol_df = symbol_df.orderBy("datetime")
+        
+        save_path = f"hdfs://hdfs-namenode:8020/crypto/yahoo/{symbol_binance.lower()}"
+        symbol_df.write.mode("overwrite").parquet(save_path)
 
-    # Combine all monthly data
-    all_df = pd.concat(monthly_dfs)
-    all_df.columns = [c[0].lower().replace(' ', '_') if isinstance(c, tuple) else c.lower().replace(' ', '_') for c in all_df.columns]
-    
-    # Rename 'date' column to 'datetime' for consistency
-    if 'date' in all_df.columns:
-        all_df = all_df.rename(columns={'date': 'datetime'})
-    
-    # Ensure datetime column is properly formatted
-    all_df['datetime'] = pd.to_datetime(all_df['datetime'])
-
-    sdf = spark.createDataFrame(all_df)
-    save_path = f"hdfs://hdfs-namenode:8020/crypto/yahoo/{symbol_binance.lower()}"
-    sdf.write.mode("overwrite").parquet(save_path)
-
-    print(f"[INFO] Saving {symbol_binance} to {save_path}")
-    print(f"[SUCCESS] {symbol_binance} written to HDFS")
+        print(f"[INFO] Saving {symbol_binance} to {save_path}")
+        print(f"[SUCCESS] {symbol_binance} written to HDFS")
+        
+    except Exception as e:
+        print(f"[ERROR] Failed to process {symbol_binance} from Kafka: {e}")
 
 spark.stop()
 
+# KEEP: Original symbols list
 symbols = [
     "btcusdt", "ethusdt", "solusdt", "bnbusdt", "xrpusdt",
     "adausdt", "dogeusdt", "linkusdt", "dotusdt", "ltcusdt"
 ]
 
+# KEEP: Original calculate_technical_indicators function (no changes)
 def calculate_technical_indicators(df):
     """Calculate comprehensive technical indicators for daily data"""
     df = df.copy()
@@ -162,15 +166,17 @@ def calculate_technical_indicators(df):
     
     return df
 
+# KEEP: Original Spark session for training
 spark = SparkSession.builder.appName("XGBoostMultiCrypto").getOrCreate()
 
+# KEEP: Original training loop (no changes, as it loads from HDFS Parquet saved by Kafka consumption)
 for symbol in symbols:
     try:
-        # Read data from HDFS
+        # Read data from HDFS  # KEEP: Original path
         path = f"hdfs://hdfs-namenode:8020/crypto/yahoo/{symbol}"
         df = spark.read.parquet(path).dropna()
         
-        # Show the most recent data instead of oldest
+        # Show the most recent data instead of oldest  # KEEP: Original
         datetime_col = 'datetime' if 'datetime' in df.columns else 'date'
         
         try:
@@ -182,7 +188,7 @@ for symbol in symbols:
             else:
                 raise Exception("No datetime or date column found")
             
-            # Convert datetime to string first, then to pandas
+            # Convert datetime to string first, then to pandas  # KEEP: Original
             df_with_string_date = df.withColumn("datetime_str", df[datetime_col].cast("string"))
             df_no_datetime = df_with_string_date.drop(datetime_col)
             
@@ -197,7 +203,7 @@ for symbol in symbols:
         except Exception as pandas_error:
             print(f"[WARN] {symbol.upper()}: Method 1 failed, trying method 2: {pandas_error}")
             try:
-                # Method 2: Drop datetime/date column entirely and work with index
+                # Method 2: Drop datetime/date column entirely and work with index  # KEEP: Original
                 datetime_col = 'datetime' if 'datetime' in df.columns else 'date'
                 df_no_datetime = df.drop(datetime_col)
                 pdf = df_no_datetime.toPandas()
@@ -209,7 +215,7 @@ for symbol in symbols:
             except Exception as pandas_error2:
                 print(f"[ERROR] {symbol.upper()}: Method 2 failed, trying method 3: {pandas_error2}")
                 try:
-                    # Method 3: Use Spark SQL to convert datetime/date to string, then pandas
+                    # Method 3: Use Spark SQL to convert datetime/date to string, then pandas  # KEEP: Original
                     df.createOrReplaceTempView("temp_df")
                     
                     # Determine which datetime column exists
@@ -231,17 +237,17 @@ for symbol in symbols:
                     print(f"[ERROR] {symbol.upper()}: All pandas conversion methods failed: {pandas_error3}")
                     continue
         
-        # Calculate comprehensive technical indicators
+        # Calculate comprehensive technical indicators  # KEEP: Original
         pdf = calculate_technical_indicators(pdf)
         
-        # Drop rows with NaN values (from rolling calculations)
+        # Drop rows with NaN values (from rolling calculations)  # KEEP: Original
         pdf = pdf.dropna()
         
-        if len(pdf) < 500:  # Need sufficient data for training
+        if len(pdf) < 500:  # Need sufficient data for training  # KEEP: Original
             print(f"[WARN] {symbol.upper()}: Insufficient data ({len(pdf)} rows)")
             continue
         
-        # Define feature columns (excluding datetime and target)
+        # Define feature columns (excluding datetime and target)  # KEEP: Original
         feature_cols = [
             'open', 'high', 'low', 'volume', 'close',
             'price_change', 'high_low_ratio', 'close_open_ratio', 'volume_price_ratio',
@@ -255,20 +261,20 @@ for symbol in symbols:
             'support_distance', 'resistance_distance'
         ]
         
-        # Prepare features and target
+        # Prepare features and target  # KEEP: Original
         X = pdf[feature_cols].values
         y = pdf['close'].values
         
-        # Scale features
+        # Scale features  # KEEP: Original
         scaler = StandardScaler()
         X_scaled = scaler.fit_transform(X)
         
-        # Split data (80% train, 20% test)
+        # Split data (80% train, 20% test)  # KEEP: Original
         split_idx = int(len(X_scaled) * 0.8)
         X_train, X_test = X_scaled[:split_idx], X_scaled[split_idx:]
         y_train, y_test = y[:split_idx], y[split_idx:]
 
-        # Improved XGBoost model with better hyperparameters
+        # Improved XGBoost model with better hyperparameters  # KEEP: Original
         model = xgb.XGBRegressor(
             objective="reg:squarederror",
             n_estimators=200,
@@ -284,7 +290,7 @@ for symbol in symbols:
         
         model.fit(X_train, y_train)
 
-        # Evaluate model
+        # Evaluate model  # KEEP: Original
         preds = model.predict(X_test)
         rmse = np.sqrt(np.mean((preds - y_test) ** 2))
         mae = np.mean(np.abs(preds - y_test))
@@ -292,36 +298,36 @@ for symbol in symbols:
         
         print(f"[{symbol.upper()}] RMSE: {rmse:.4f}, MAE: {mae:.4f}, MAPE: {mape:.2f}%")
         
-        # Calculate additional metrics for prediction
+        # Calculate additional metrics for prediction  # KEEP: Original
         last_price = float(pdf['close'].iloc[-1])
         price_change_pct = float((last_price - pdf['close'].iloc[-2]) / pdf['close'].iloc[-2] * 100)
         volume_change_pct = float((pdf['volume'].iloc[-1] - pdf['volume'].iloc[-2]) / pdf['volume'].iloc[-2] * 100)
 
-        # Get latest technical indicators
+        # Get latest technical indicators  # KEEP: Original
         latest_row = pdf.iloc[-1]
         
-        # Generate prediction for next day
+        # Generate prediction for next day  # KEEP: Original
         latest_features = X_scaled[-1:].reshape(1, -1)
         next_pred = float(model.predict(latest_features)[0])
         
-        # Calculate prediction confidence based on multiple factors
+        # Calculate prediction confidence based on multiple factors  # KEEP: Original
         recent_volatility = float(latest_row["volatility_7d"])
         price_volatility_ratio = recent_volatility / last_price if last_price > 0 else 0
         
-        # Calculate additional confidence factors
+        # Calculate additional confidence factors  # KEEP: Original
         rsi = float(latest_row["rsi"])
         bb_position = float(latest_row["bb_position"])
         
-        # RSI-based confidence (extreme RSI = lower confidence)
+        # RSI-based confidence (extreme RSI = lower confidence)  # KEEP: Original
         rsi_confidence = 1.0 - abs(rsi - 50) / 50  # Closer to 50 = higher confidence
         
-        # Bollinger Band position confidence (middle = higher confidence)
+        # Bollinger Band position confidence (middle = higher confidence)  # KEEP: Original
         bb_confidence = 1.0 - abs(bb_position - 0.5) * 2  # Closer to 0.5 = higher confidence
         
-        # Overall confidence score (0-1)
+        # Overall confidence score (0-1)  # KEEP: Original
         overall_confidence = (rsi_confidence + bb_confidence + (1 - min(price_volatility_ratio * 10, 1))) / 3
         
-        # Determine confidence level
+        # Determine confidence level  # KEEP: Original
         if overall_confidence > 0.7:
             confidence_level = "high"
         elif overall_confidence > 0.4:
@@ -331,7 +337,7 @@ for symbol in symbols:
         
         print(f"[{symbol.upper()}] Confidence factors - Volatility: {price_volatility_ratio:.2%}, RSI: {rsi:.1f}, BB: {bb_position:.2f}, Overall: {overall_confidence:.2f} ({confidence_level})")
         
-        # Adjust prediction to be more conservative if volatility is high
+        # Adjust prediction to be more conservative if volatility is high  # KEEP: Original
         if price_volatility_ratio > 0.05:  # If volatility > 5%
             # Use moving average as baseline instead of raw prediction
             ma_7d = float(latest_row["ma_7d"])
@@ -343,12 +349,13 @@ for symbol in symbols:
             
             print(f"[{symbol.upper()}] High volatility detected ({price_volatility_ratio:.2%}), using conservative prediction")
         
-        # Ensure prediction is within reasonable bounds (not more than 50% change)
+        # Ensure prediction is within reasonable bounds (not more than 50% change)  # KEEP: Original
         max_change = 0.5  # 50% max change
         min_pred = last_price * (1 - max_change)
         max_pred = last_price * (1 + max_change)
         next_pred = max(min_pred, min(next_pred, max_pred))
 
+        # KEEP: Original prediction_result dictionary (full structure retained)
         prediction_result = {
             "symbol": symbol,
             "predicted_price": next_pred,
@@ -413,6 +420,7 @@ for symbol in symbols:
             "test_data_points": len(X_test)
         }
 
+        # KEEP: Original local save
         local_pred_path = f"/opt/spark/work-dir/models/xgboost_{symbol}_prediction.json"
         
         with open(local_pred_path, "w") as f:
@@ -420,16 +428,19 @@ for symbol in symbols:
 
         print(f"[{symbol.upper()}] Model, scaler & prediction saved to local")
 
+        # KEEP: Original HDFS upload (though note: model and scaler are not explicitly saved in code; only prediction JSON)
         hdfs_pred_path = f"hdfs://hdfs-namenode:8020/models/xgboost_{symbol}_prediction.json"
 
+        import os  # KEEP: For os.system
         os.system(f"hadoop fs -put -f {local_pred_path} {hdfs_pred_path}")
 
         print(f"[{symbol.upper()}] Uploaded to HDFS successfully")
 
     except Exception as e:
         print(f"[ERROR] {symbol.upper()}: {e}")
-        import traceback
+        import traceback  # KEEP: For error handling
         print(f"[ERROR] {symbol.upper()}: Full traceback:")
         traceback.print_exc()
 
+# KEEP: Original final Spark stop
 spark.stop()
