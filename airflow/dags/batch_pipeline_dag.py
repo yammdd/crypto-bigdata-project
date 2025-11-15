@@ -11,7 +11,7 @@ with DAG(
     dag_id="batch_pipeline",
     default_args=default_args,
     schedule_interval="@daily", # use @once if you want it to run immediately after it is built
-    catchup=False,
+    catchup=False, # use True if you want to run for all missed intervals
 ) as dag:
 
     run_batch = BashOperator(

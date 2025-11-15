@@ -1,6 +1,6 @@
 # 🚀 Crypto Big Data Project
 
-This project builds a **complete Big Data pipeline** for analyzing cryptocurrency market data using **Apache Spark**, **MongoDB**, **Kafka**, and **Streamlit**.  
+This project builds a **complete Big Data pipeline** for analyzing cryptocurrency market data using **Spark**, **HBase**, **Kafka**, **Zookeeper**, **HDFS**, **Airflow**, **MongoDB**, **Flask** and **Streamlit**.  
 It demonstrates scalable data processing, streaming updates, and interactive dashboards.
 
 ---
@@ -17,71 +17,43 @@ cd crypto-bigdata-project
 
 ---
 
-### 2️⃣ Create the `models` Folder
+### 2️⃣ Build and Start Docker Containers
 
-Inside the project root, create a folder named `models`:
-
-```bash
-mkdir models
-```
-
-Your project structure should now look like this:
-
-```
-crypto-bigdata-project/
-├── batch/
-├── stream/
-├── models/        ← Create this folder
-├── docker-compose.yml
-└── ...
-```
-
----
-
-### 3️⃣ Build and Start Docker Containers
-
-Run the following command to build and launch all services:
+Run the following command to build and launch all services, **make sure you have Docker**:
 
 ```bash
 docker compose up -d --build
 ```
 
 This will automatically start:
-- **Zookeeper & Kafka** (for data streaming)  
+- **Zookeeper & Kafka & Producer** (for data streaming)  
 - **Spark Master & Worker nodes**  
-- **MongoDB** (for storing processed data)  
+- **Airflow & Hadoop HDFS**
+- **MongoDB & HBase** (for storing processed data)  
 - **Streamlit** dashboard and **Flask API**
 
 ---
 
-### 4️⃣ Access Spark Master Container
+### 3️⃣ Setup Batch jobs (optional)
 
-Once everything is running, access the Spark master container:
+> 💡 **Highly Recommended:**  
+> Before Docker run: In file `airflow/dags/batch_pipeline_dag.py`, set `schedule_interval="@once"` so the DAG runs automatically when Airflow starts.
 
+
+**Advanced Tips**: Retrieve Airflow Admin Password
+
+After starting Docker:
 ```bash
-docker exec -it spark-master bash
+docker logs airflow | findstr "password"
 ```
 
-Set the Spark binary path:
-
+The result will show your Airflow `username` and `password` like:
 ```bash
-export PATH=$PATH:/opt/spark/bin
+Login with username: admin  password: nUPv6yYUp5WRRD94
 ```
 
----
+Use this on `localhost:3636` to check the batch process daily.
 
-### 5️⃣ Run Batch Processing Jobs
-
-Run the following commands **sequentially** to process hourly and daily data, and update MongoDB:
-
-```bash
-spark-submit /opt/spark/work-dir/batch/data_pipeline_1h.py
-spark-submit /opt/spark/work-dir/batch/data_pipeline_1d.py
-spark-submit /opt/spark/work-dir/batch/write_to_mongo.py
-```
-
-> 💡 **Tip:**  
-> Execute these scripts **periodically** (e.g., every few hours or once daily) to refresh the model and batch layer data.
 
 ---
 
