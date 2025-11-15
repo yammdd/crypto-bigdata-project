@@ -154,7 +154,10 @@ services:
       - .:/app  # Đảm bảo batch/streamlit_batch_dashboard.py tồn tại trong container
 
   airflow:
-    image: apache/airflow:2.9.1-python3.10
+    build:
+      context: ./airflow
+      dockerfile: Dockerfile
+    image: custom-airflow:latest
     container_name: airflow
     depends_on:
       - spark-master
@@ -167,12 +170,14 @@ services:
       - ./airflow/dags:/opt/airflow/dags
       - ./airflow/logs:/opt/airflow/logs
       - ./airflow/plugins:/opt/airflow/plugins
+      - ./airflow/scripts:/opt/airflow/scripts
       - /var/run/docker.sock:/var/run/docker.sock
     command: >
       bash -c "
         airflow db migrate &&
         airflow standalone
       "
+
 
 
 volumes:
