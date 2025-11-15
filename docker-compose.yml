@@ -41,7 +41,6 @@ services:
       - PYTHONPATH=/opt/spark/work-dir
       - GOOGLE_AI_API_KEY=${GOOGLE_AI_API_KEY}
       - NEWS_API_KEY=${NEWS_API_KEY}
-    #command: ["/opt/spark/bin/spark-submit", "/opt/spark/work-dir/streaming/spark_streaming.py"]
     command: ["bash", "-c", "mkdir -p /opt/spark/work-dir/models && /opt/spark/bin/spark-submit /opt/spark/work-dir/streaming/spark_streaming.py"]
 
   spark-worker:
@@ -82,16 +81,30 @@ services:
     volumes:
       - ./hadoop_data/datanode:/hadoop/dfs/data
 
+  # hbase:
+  #   image: dajobe/hbase:latest
+  #   container_name: hbase
+  #   ports:
+  #     - "16010:16010" 
+  #     - "9090:9090"   
+  #   environment:
+  #     - HBASE_MANAGES_ZK=true
+  #   volumes:
+  #     - ./hbase-data:/opt/hbase-data
+
   hbase:
-    image: dajobe/hbase:latest
+    image: harisekhon/hbase:latest
     container_name: hbase
-    ports:
-      - "16010:16010" 
-      - "9090:9090"   
     environment:
-      - HBASE_MANAGES_ZK=true
+      #HBASE_HEAPSIZE: 1G
+      HBASE_MANAGES_ZK: "true"
+    ports:
+      - "9090:9090"
+      - "16010:16010"
     volumes:
       - ./hbase-data:/opt/hbase-data
+    # command: >
+    #   bash -c "start-hbase.sh && hbase-daemon.sh start thrift && tail -f /dev/null"
 
   mongodb:
     image: mongo
@@ -139,6 +152,27 @@ services:
       - mongodb
     volumes:
       - .:/app  # Đảm bảo batch/streamlit_batch_dashboard.py tồn tại trong container
+
+  airflow:
+    image: apache/airflow:2.9.1-python3.10
+    container_name: airflow
+    depends_on:
+      - spark-master
+    ports:
+      - "3636:8080"
+    environment:
+      - AIRFLOW__CORE__LOAD_EXAMPLES=False
+      - AIRFLOW__CORE__EXECUTOR=SequentialExecutor
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/logs:/opt/airflow/logs
+      - ./airflow/plugins:/opt/airflow/plugins
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: >
+      bash -c "
+        airflow db migrate &&
+        airflow standalone
+      "
 
 
 volumes:

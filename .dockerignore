@@ -1,0 +1,9 @@
+airflow/logs/
+airflow/logs/**
+airflow/scheduler/
+airflow/dags/__pycache__/
+airflow/plugins/__pycache__/
+**/__pycache__/
+*.pyc
+*.log
+*.db
