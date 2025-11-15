@@ -38,6 +38,7 @@ This will automatically start:
 
 > 💡 **Highly Recommended:**  
 > Before Docker run: In file `airflow/dags/batch_pipeline_dag.py`, set `schedule_interval="@once"` so the DAG runs automatically when Airflow starts.
+> That is how you can get XGBoost price prediction models and historical data.
 
 
 **Advanced Tips**: Retrieve Airflow Admin Password
