@@ -34,14 +34,9 @@ This will automatically start:
 
 ---
 
-### 3️⃣ Setup Batch jobs (optional)
+### 3️⃣ Setup Batch jobs
 
-> 💡 **Highly Recommended:**  
-> Before Docker run: In file `airflow/dags/batch_pipeline_dag.py`, set `schedule_interval="@once"` so the DAG runs automatically when Airflow starts.
-> That is how you can get XGBoost price prediction models and historical data.
-
-
-**Advanced Tips**: Retrieve Airflow Admin Password
+This step is how you can get XGBoost price prediction models and historical data.
 
 After starting Docker:
 ```bash
@@ -53,7 +48,10 @@ The result will show your Airflow `username` and `password` like:
 Login with username: admin  password: nUPv6yYUp5WRRD94
 ```
 
-Use this on `localhost:3636` to check the batch process daily.
+Use this on `localhost:3636` and trigger DAG for the 1st run.
+
+> 💡Tip
+> In file `airflow/dags/batch_pipeline_dag.py`, set `schedule_interval="@daily"` and it will update models daily when you start Docker.
 
 
 ---
