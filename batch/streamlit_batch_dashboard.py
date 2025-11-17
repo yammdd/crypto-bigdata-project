@@ -171,10 +171,23 @@ def get_mongodb_data():
     except Exception as e:
         st.error(f"Failed to connect to MongoDB: {e}")
         return []
+    
+@st.cache_data(ttl=300)  # Cache 5 phút cho historical data
+def get_historical_data():
+    try:
+        client = MongoClient("mongodb://mongodb:27017", serverSelectionTimeoutMS=5000)
+        hist_collection = client["crypto_batch"]["historical_prices"]
+        data = list(hist_collection.find({}, {"_id": 0, "symbol": 1, "datetime": 1, "open": 1, "high": 1, "low": 1, "close": 1, "volume": 1}).limit(100000))  # Limit để tránh quá tải
+        client.close()
+        return data
+    except Exception as e:
+        st.error(f"Failed to connect to historical MongoDB: {e}")
+        return []
 
 # Get data
 with st.spinner("🔄 Loading prediction data..."):
     data = get_mongodb_data()
+    historical_data = get_historical_data()
 
 if not data:
     st.error("❌ No data found in MongoDB. Please ensure the batch processing pipeline is running.")
@@ -194,20 +207,6 @@ if volatility_filter != "All":
         df = df[(df["volatility_ratio"] >= 0.05) & (df["volatility_ratio"] <= 0.15)]
     elif volatility_filter == "High (> 15%)":
         df = df[df["volatility_ratio"] > 0.15]
-
-# Outlier clipping for better visualization
-# clip_cols = ["volume", "volatility_7d", "volatility_14d", "volatility_30d"]
-# for c in clip_cols:
-#     if c in df.columns:
-#         df[c] = np.clip(df[c], 0, np.percentile(df[c], 95))
-
-# Debug: Print available columns
-# st.sidebar.markdown("---")
-# st.sidebar.markdown("### 🔍 Debug Info")
-# st.sidebar.write(f"**Available columns:** {len(df.columns)}")
-# st.sidebar.write(f"**Data shape:** {df.shape}")
-# if st.sidebar.checkbox("Show column names"):
-#     st.sidebar.write(list(df.columns))
 
 # Calculate key metrics
 total_traded_value = (df['predicted_price'] * df['volume']).sum()
@@ -264,9 +263,178 @@ with kpi4:
 
 # Main dashboard tabs
 st.markdown("---")
-tabs = st.tabs(["🎯 Predictions Overview", "📈 Price Analysis", "🔍 Risk Assessment", "🤖 Model Performance", "💼 Portfolio Insights", "📊 Raw Data"])
+tabs = st.tabs(["📊 Historical Price Trends", "🎯 Predictions Overview", "📈 Price Analysis", "🔍 Risk Assessment", "🤖 Model Performance", "💼 Portfolio Insights", "📉 Raw Data"])
 
-with tabs[0]:
+with tabs[0]:  # Tab Historical Price Trends
+    st.markdown("### Historical Price Trends")
+    
+    # Check historical data
+    if not historical_data:
+        st.error("❌ No historical data found in MongoDB collection 'historical_prices'. Ensure the HDFS → MongoDB loading script has run successfully.")
+        st.info("💡 Run the HDFS → MongoDB data loading script to populate historical data.")
+        st.stop()
+    
+    # Convert to DataFrame
+    if historical_data:
+        df_historical = pd.DataFrame(historical_data)
+        # Convert datetime string to datetime object
+        df_historical['datetime'] = pd.to_datetime(df_historical['datetime'])
+        # Convert symbols to uppercase
+        df_historical['symbol'] = df_historical['symbol'].str.upper()
+        # Sort by symbol and datetime
+        df_historical = df_historical.sort_values(['symbol', 'datetime'])
+        
+        # Get unique symbols list
+        available_symbols = sorted(df_historical['symbol'].unique())
+        
+        if len(available_symbols) == 0:
+            st.error("❌ No symbols found in historical data.")
+            st.stop()
+        
+        st.success(f"✅ Loaded {len(df_historical):,} historical records for {len(available_symbols)} cryptocurrencies.")
+        
+        # Dropdown to select 1 symbol
+        st.markdown("### Select Cryptocurrency")
+        selected_symbol = st.selectbox(
+            "Choose cryptocurrency to view historical price chart:",
+            options=available_symbols,
+            index=0,
+            help="Select one cryptocurrency to view complete historical price data over time"
+        )
+        
+        # Filter data for selected symbol
+        symbol_data = df_historical[df_historical['symbol'] == selected_symbol]
+        
+        if len(symbol_data) == 0:
+            st.error(f"❌ No data available for {selected_symbol}.")
+            st.stop()
+        
+        # Time range filter for this symbol
+        st.markdown("### 📅 Time Range Filter")
+        time_range = st.selectbox(
+            "Select time period:",
+            ["All Data", "Last 6 Months", "Last 3 Months", "Last 1 Month", "Last 1 Week"],
+            index=0
+        )
+        
+        # Apply time filter
+        end_date = pd.Timestamp.now()
+        if time_range == "All Data":
+            start_date = symbol_data['datetime'].min()
+        elif time_range == "Last 6 Months":
+            start_date = end_date - timedelta(days=180)
+        elif time_range == "Last 3 Months":
+            start_date = end_date - timedelta(days=90)
+        elif time_range == "Last 1 Month":
+            start_date = end_date - timedelta(days=30)
+        else:  # Last 1 Week
+            start_date = end_date - timedelta(days=7)
+        
+        filtered_data = symbol_data[
+            (symbol_data['datetime'] >= start_date) & 
+            (symbol_data['datetime'] <= end_date)
+        ].copy()
+        
+        if len(filtered_data) == 0:
+            st.warning(f"⚠️ No data available in '{time_range}' period for {selected_symbol}.")
+            st.stop()
+        
+        # Simple price line chart (only 1 line)
+        st.markdown("### 📈 Historical Price Chart")
+        
+        fig_price = go.Figure()
+        
+        # Add only close price line
+        fig_price.add_trace(go.Scatter(
+            x=filtered_data['datetime'],
+            y=filtered_data['close'],
+            mode='lines',
+            name=f"{selected_symbol} Close Price",
+            line=dict(color='#667eea', width=3),
+            hovertemplate='<b>%{fullData.name}</b><br>' +
+                         'Time: %{x}<br>' +
+                         'Price: $%{y:.4f}<extra></extra>'
+        ))
+        
+        # Add average line as reference (optional, simple dashed line)
+        avg_price = filtered_data['close'].mean()
+        fig_price.add_hline(
+            y=avg_price,
+            line_dash="dash",
+            line_color="red",
+            annotation_text=f"Average: ${avg_price:.4f}",
+            annotation_position="top right"
+        )
+        
+        # Update layout
+        fig_price.update_layout(
+            title=f"{selected_symbol} - Close Price Over Time ({time_range})",
+            xaxis_title="Time",
+            yaxis_title="Price (USD)",
+            height=500,
+            showlegend=True,
+            hovermode='x unified',
+            template='plotly_white',
+            xaxis=dict(showgrid=True, gridwidth=1, gridcolor='lightgray'),
+            yaxis=dict(showgrid=True, gridcolor='lightgray')
+        )
+        
+        st.plotly_chart(fig_price, use_container_width=True)
+        
+        # Basic summary metrics
+        st.markdown("### 📊 Basic Summary")
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            total_days = (filtered_data['datetime'].max() - filtered_data['datetime'].min()).days + 1
+            st.metric("Total Days", f"{total_days} days")
+        
+        with col2:
+            total_records = len(filtered_data)
+            st.metric("Records", f"{total_records:,}")
+        
+        with col3:
+            start_price = filtered_data['close'].iloc[0]
+            end_price = filtered_data['close'].iloc[-1]
+            st.metric("Start Price", f"${start_price:.4f}")
+        
+        with col4:
+            change_pct = ((end_price - start_price) / start_price) * 100
+            change_color = "normal" if change_pct >= 0 else "inverse"
+            st.metric("Total Change", f"{change_pct:.2f}%", delta=change_pct)
+        
+        # Download CSV for this symbol
+        st.markdown("### 📥 Download Data")
+        
+        # Prepare export data (only essential columns)
+        export_data = filtered_data[['symbol', 'datetime', 'close']].copy()
+        export_data['datetime'] = export_data['datetime'].dt.strftime('%Y-%m-%d %H:%M:%S')
+        export_data = export_data.rename(columns={
+            'symbol': 'Symbol',
+            'datetime': 'DateTime',
+            'close': 'ClosePrice'
+        })
+        
+        csv_data = export_data.to_csv(index=False)
+        
+        st.download_button(
+            label=f"📥 Download CSV: {selected_symbol} ({len(export_data):,} records, {time_range})",
+            data=csv_data,
+            file_name=f"{selected_symbol.lower()}_price_history_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.csv",
+            mime="text/csv",
+            use_container_width=True
+        )
+        
+        # Data information
+        st.markdown("---")
+        st.markdown(f"**Data Range:** {filtered_data['datetime'].min().strftime('%Y-%m-%d')} to {filtered_data['datetime'].max().strftime('%Y-%m-%d')}")
+        st.markdown(f"**Source:** HDFS → MongoDB collection 'historical_prices'")
+        st.markdown(f"**Last Updated:** {pd.Timestamp.now('Asia/Bangkok').strftime('%Y-%m-%d %H:%M:%S')}")
+        
+    else:
+        st.error("❌ Error processing historical data from MongoDB.")
+
+with tabs[1]:
     st.markdown("### Prediction Overview")
     
     # Prediction confidence distribution
@@ -312,7 +480,7 @@ with tabs[0]:
     top_predictions['confidence_score'] = top_predictions['confidence_score'].round(3)
     st.dataframe(top_predictions, use_container_width=True)
 
-with tabs[1]:
+with tabs[2]:
     st.markdown("### Price Analysis")
     
     # Price comparison chart
@@ -370,7 +538,7 @@ with tabs[1]:
                            color_discrete_map={'high': '#27ae60', 'medium': '#f39c12', 'low': '#e74c3c'})
         st.plotly_chart(fig_vol, use_container_width=True)
 
-with tabs[2]:
+with tabs[3]:
     st.markdown("### Risk Assessment")
     
     # Risk metrics
@@ -426,7 +594,7 @@ with tabs[2]:
     else:
         st.warning("Not enough numeric columns for correlation analysis")
 
-with tabs[3]:
+with tabs[4]:
     st.markdown("### Model Performance")
     
     # Model metrics
@@ -473,7 +641,7 @@ with tabs[3]:
                               title="Model Confidence vs Performance")
     st.plotly_chart(fig_perf_conf, use_container_width=True)
 
-with tabs[4]:
+with tabs[5]:
     st.markdown("### Portfolio Insights")
     
     # Portfolio allocation recommendations
@@ -571,7 +739,7 @@ with tabs[4]:
     with col2:
         st.plotly_chart(fig_ma2, use_container_width=True)
 
-with tabs[5]:
+with tabs[6]:
     st.markdown("### Raw Data & System Health")
     
     # System Health Monitoring
