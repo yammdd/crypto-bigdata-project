@@ -163,7 +163,7 @@ st.sidebar.markdown(f"• **Last updated**: {pd.Timestamp.now('Asia/Bangkok').st
 @st.cache_data(ttl=10)  # Cache for only 10 seconds
 def get_mongodb_data():
     try:
-        client = MongoClient("mongodb://mongodb:27017", serverSelectionTimeoutMS=5000)
+        client = MongoClient("mongodb://mongodb:27017", serverSelectionTimeoutMS=10000)
         collection = client["crypto_batch"]["predictions"]
         data = list(collection.find())
         client.close()
@@ -175,7 +175,7 @@ def get_mongodb_data():
 @st.cache_data(ttl=300)  # Cache 5 phút cho historical data
 def get_historical_data():
     try:
-        client = MongoClient("mongodb://mongodb:27017", serverSelectionTimeoutMS=5000)
+        client = MongoClient("mongodb://mongodb:27017", serverSelectionTimeoutMS=10000)
         hist_collection = client["crypto_batch"]["historical_prices"]
         data = list(hist_collection.find({}, {"_id": 0, "symbol": 1, "datetime": 1, "open": 1, "high": 1, "low": 1, "close": 1, "volume": 1}).limit(100000))  # Limit để tránh quá tải
         client.close()
@@ -185,8 +185,9 @@ def get_historical_data():
         return []
 
 # Get data
-with st.spinner("🔄 Loading prediction data..."):
+with st.spinner("Loading statistical data"):
     data = get_mongodb_data()
+with st.spinner("Loading historicaldata"):
     historical_data = get_historical_data()
 
 if not data:
@@ -210,8 +211,15 @@ if volatility_filter != "All":
 
 # Calculate key metrics
 total_traded_value = (df['predicted_price'] * df['volume']).sum()
-best_performer = df.loc[df['prediction_change_pct'].idxmax()]
-worst_performer = df.loc[df['prediction_change_pct'].idxmin()]
+
+best_performer = None
+worst_performer = None
+
+if df.empty or df['prediction_change_pct'].dropna().empty:
+    st.warning("No data available.")
+else:
+    best_performer = df.loc[df['prediction_change_pct'].idxmax()]
+    worst_performer = df.loc[df['prediction_change_pct'].idxmin()]
 
 # Convert confidence strings to numeric scores for calculations
 confidence_mapping = {'high': 0.8, 'medium': 0.5, 'low': 0.2}
@@ -237,11 +245,19 @@ with kpi1:
     """, unsafe_allow_html=True)
 
 with kpi2:
-    change_color = "positive-change" if best_performer['prediction_change_pct'] > 0 else "negative-change"
-    st.markdown(f"""
-    <div class="metric-card">
-        <div class="metric-value {change_color}">{best_performer['prediction_change_pct']:.2f}%</div>
-        <div class="metric-label">Best Performer ({best_performer['symbol']})</div>
+    if best_performer is None:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-value">N/A</div>
+            <div class="metric-label">Best Performer</div>
+        </div>
+        """, unsafe_allow_html=True)
+    else:
+        change_color = "positive-change" if best_performer['prediction_change_pct'] > 0 else "negative-change"
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-value {change_color}">{best_performer['prediction_change_pct']:.2f}%</div>
+            <div class="metric-label">Best Performer ({best_performer['symbol']})</div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -291,7 +307,7 @@ with tabs[0]:  # Tab Historical Price Trends
             st.error("❌ No symbols found in historical data.")
             st.stop()
         
-        st.success(f"✅ Loaded {len(df_historical):,} historical records for {len(available_symbols)} cryptocurrencies.")
+        #st.success(f"✅ Loaded {len(df_historical):,} historical records for {len(available_symbols)} cryptocurrencies.")
         
         # Dropdown to select 1 symbol
         st.markdown("### Select Cryptocurrency")
@@ -428,7 +444,7 @@ with tabs[0]:  # Tab Historical Price Trends
         # Data information
         st.markdown("---")
         st.markdown(f"**Data Range:** {filtered_data['datetime'].min().strftime('%Y-%m-%d')} to {filtered_data['datetime'].max().strftime('%Y-%m-%d')}")
-        st.markdown(f"**Source:** HDFS → MongoDB collection 'historical_prices'")
+        st.markdown(f"**Source:** Yahoo Finance → HDFS → MongoDB")
         st.markdown(f"**Last Updated:** {pd.Timestamp.now('Asia/Bangkok').strftime('%Y-%m-%d %H:%M:%S')}")
         
     else:
