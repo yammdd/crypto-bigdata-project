@@ -67,6 +67,17 @@ Use this on `localhost:3636` and trigger DAG for the 1st run.
 | **Batch Layer** | Historical trends and model visualization | [http://localhost:8501](http://localhost:8501) |
 
 ---
+## 💻Demo
+### Batch Layer:
+
+https://github.com/user-attachments/assets/bafc919b-4ea8-435b-b037-c6fa3cfa0368
+
+### Stream Layer:
+
+https://github.com/user-attachments/assets/c7a76e66-c973-4aff-b86e-f109348d3b97
+
+
+---
 
 ## 🛠️ Useful Notes & Commands
 
