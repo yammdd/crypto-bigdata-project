@@ -40,7 +40,7 @@ This step is how you can get XGBoost price prediction models and historical data
 
 After starting Docker:
 ```bash
-docker logs airflow | findstr "password"
+docker logs airflow | findstr /i "password"
 ```
 
 The result will show your Airflow `username` and `password` like:
