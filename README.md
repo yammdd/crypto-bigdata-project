@@ -50,7 +50,10 @@ Login with username: admin  password: nUPv6yYUp5WRRD94
 
 Use this on `localhost:3636` and trigger DAG for the 1st run.
 
-> 💡Tip
+> 💡Tips:
+> 
+> Press F5 once or twice (refresh `localhost:3636`) in case no username or password is shown upon using the aforementioned command.
+> 
 > In file `airflow/dags/batch_pipeline_dag.py`, set `schedule_interval="@daily"` and it will update models daily when you start Docker.
 
 
