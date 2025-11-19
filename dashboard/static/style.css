@@ -125,12 +125,11 @@ body.light-mode #theme-toggle-btn {
   height: 100%;
   -webkit-backface-visibility: hidden;
   backface-visibility: hidden;
-  box-sizing: border-box; /* Đảm bảo padding không làm vỡ layout */
+  box-sizing: border-box;
 }
 
 .crypto-card-front {
   z-index: 2;
-  /* transform rotateY(0deg) is default */
 }
 
 .crypto-card-back {
@@ -421,7 +420,6 @@ body.light-mode .chat-container.minimized .chat-toggle-btn {
     background-image: url('/static/bot-icon-light.png');
 }
 
-/* Loại bỏ class hidden không còn dùng cho việc lật card */
 .hidden {
   display: none !important;
 }

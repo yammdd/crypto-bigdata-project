@@ -3,7 +3,7 @@ import os
 import time
 
 def ensure_table_exists(connection, table_name):
-    """Tạo bảng HBase nếu chưa tồn tại."""
+    """Create HBase table if it does not exist."""
     try:
         tables = [t.decode() for t in connection.tables()]
         if table_name not in tables:

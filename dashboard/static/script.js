@@ -10,12 +10,10 @@ const attrs = [
 
 const cards = {};
 const previousData = {};
-
 const charts = {};
 
-// Hàm hỗ trợ để định dạng timestamp thành chuỗi thời gian dễ đọc
 function formatTimestampToTime(timestamp) {
-  const date = new Date(timestamp * 1000); // timestamp từ HBase thường là giây
+  const date = new Date(timestamp * 1000); 
   return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 }
 
@@ -125,7 +123,6 @@ function createCard(symbol) {
   drawChart(symbol);
 }
 
-// Sửa đổi hàm drawChart để khởi tạo và lưu trữ biểu đồ
 function drawChart(symbol) {
     const isLightMode = document.body.classList.contains('light-mode');
     const legendColor = isLightMode ? '#1c1e21' : 'white';
@@ -136,14 +133,14 @@ function drawChart(symbol) {
     charts[symbol] = new Chart(ctx, {
         type: 'line',
         data: {
-            labels: [], // Sẽ được điền bởi dữ liệu lịch sử
+            labels: [],
             datasets: [{
                 label: `${symbol.toUpperCase()} Price`,
-                data: [], // Sẽ được điền bởi dữ liệu lịch sử
+                data: [],
                 fill: false,
                 borderColor: 'rgb(75, 192, 192)',
                 tension: 0.1,
-                pointRadius: 0 // Ẩn các điểm dữ liệu
+                pointRadius: 0
             }]
         },
         options: {
@@ -151,9 +148,9 @@ function drawChart(symbol) {
             maintainAspectRatio: false,
             plugins: {
                 legend: {
-                    display: true, // Hiển thị legend
+                    display: true, 
                     labels: {
-                        color: legendColor // Màu chữ legend
+                        color: legendColor 
                     }
                 },
                 tooltip: {
@@ -180,7 +177,7 @@ function drawChart(symbol) {
                     ticks: {
                         color: tickColor,
                         callback: function(value, index, values) {
-                            return formatPrice(value); // Định dạng giá trên trục y
+                            return formatPrice(value); 
                         }
                     },
                     grid: { color: gridColor }
@@ -190,7 +187,6 @@ function drawChart(symbol) {
     });
 }
 
-// Hàm mới để cập nhật biểu đồ với dữ liệu lịch sử và real-time
 async function updateChartData(symbol) {
     try {
         const res = await fetch(`/api/crypto/history/${symbol}`);
@@ -203,7 +199,7 @@ async function updateChartData(symbol) {
             if (charts[symbol]) {
                 charts[symbol].data.labels = labels;
                 charts[symbol].data.datasets[0].data = dataPoints;
-                charts[symbol].update('none'); // Cập nhật không có animation để mượt hơn
+                charts[symbol].update('none'); 
             }
         }
     } catch (err) {
@@ -325,12 +321,11 @@ function main() {
     createCard(symbol);
     updateLive(symbol);
     updatePrediction(symbol);
-    updateChartData(symbol); // Gọi hàm này để tải dữ liệu ban đầu cho biểu đồ
+    updateChartData(symbol); 
 
-    setInterval(() => updateLive(symbol), 3000);
+    setInterval(() => updateLive(symbol), 2000);
     setInterval(() => updatePrediction(symbol), 10000);
-    // Cập nhật biểu đồ thường xuyên hơn để giữ cho nó gần real-time
-    setInterval(() => updateChartData(symbol), 3000); // Cập nhật mỗi 3 giây
+    setInterval(() => updateChartData(symbol), 2000); 
   });
 }
 
@@ -395,7 +390,7 @@ document.addEventListener('DOMContentLoaded', (event) => {
         const data = await res.json();
         addMessage(data.answer || data.error || "Sorry, I couldn't get a response.", 'bot');
       } catch (error) {
-        addMessage("Rất tiếc, tôi đang gặp sự cố kết nối. Vui lòng thử lại sau.", 'bot');
+        addMessage("I'm sorry, I'm having trouble connecting. Please try again later.", 'bot');
       }
     }
   
@@ -419,7 +414,6 @@ document.addEventListener('DOMContentLoaded', (event) => {
     const newTickColor = isLight ? '#606770' : 'grey';
     const newGridColor = isLight ? 'rgba(0, 0, 0, 0.1)' : 'rgba(200, 200, 200, 0.1)';
 
-    // Cập nhật màu sắc cho tất cả biểu đồ đang có
     Object.values(charts).forEach(chart => {
         chart.options.plugins.legend.labels.color = newLegendColor;
         chart.options.scales.x.ticks.color = newTickColor;

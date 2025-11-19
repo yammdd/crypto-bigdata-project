@@ -3,7 +3,7 @@ from airflow.operators.bash import BashOperator
 from datetime import datetime
 
 default_args = {
-    "owner": "dan",
+    "owner": "dan", # replace with your name
     "start_date": datetime(2025, 1, 1),
 }
 
@@ -22,7 +22,6 @@ with DAG(
         python3 /opt/airflow/scripts/yahoo_producer.py
         """,
     )
-
 
     run_daily_pipeline = BashOperator(
         task_id="run_daily_data_pipeline",

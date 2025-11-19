@@ -81,30 +81,16 @@ services:
     volumes:
       - ./hadoop_data/datanode:/hadoop/dfs/data
 
-  # hbase:
-  #   image: dajobe/hbase:latest
-  #   container_name: hbase
-  #   ports:
-  #     - "16010:16010" 
-  #     - "9090:9090"   
-  #   environment:
-  #     - HBASE_MANAGES_ZK=true
-  #   volumes:
-  #     - ./hbase-data:/opt/hbase-data
-
   hbase:
     image: harisekhon/hbase:latest
     container_name: hbase
     environment:
-      #HBASE_HEAPSIZE: 1G
       HBASE_MANAGES_ZK: "true"
     ports:
       - "9090:9090"
       - "16010:16010"
     volumes:
       - ./hbase-data:/opt/hbase-data
-    # command: >
-    #   bash -c "start-hbase.sh && hbase-daemon.sh start thrift && tail -f /dev/null"
 
   mongodb:
     image: mongo
@@ -144,14 +130,14 @@ services:
   streamlit:
     build:
       context: .
-      dockerfile: docker/streamlit/Dockerfile  # CHỈ dùng Dockerfile này
+      dockerfile: docker/streamlit/Dockerfile
     container_name: streamlit
     ports:
       - "8501:8501"
     depends_on:
       - mongodb
     volumes:
-      - .:/app  # Đảm bảo batch/streamlit_batch_dashboard.py tồn tại trong container
+      - .:/app
 
   airflow:
     build:
@@ -177,8 +163,6 @@ services:
         airflow db migrate &&
         airflow standalone
       "
-
-
 
 volumes:
   namenode:

@@ -25,10 +25,10 @@ producer = KafkaProducer(
 )
 
 def fetch_and_produce_yahoo_data(interval="1d", topic_name="crypto_prices_yahoo_daily"):
-    print(f"\n--- Starting Yahoo Finance Producer for {interval} data ---")
+    print(f"\nStarting Yahoo Finance Producer for {interval} data")
 
     end_date = datetime.now()
-    start_date = end_date - timedelta(days=365 * 2)  # 2 năm
+    start_date = end_date - timedelta(days=365 * 2)  # 2 years back, change if you want more/less data, be careful with rate limits
 
     for symbol_binance, symbol_yahoo in symbol_map.items():
         all_dfs = []
@@ -89,7 +89,7 @@ def fetch_and_produce_yahoo_data(interval="1d", topic_name="crypto_prices_yahoo_
             producer.send(topic_name, output)
 
     producer.flush()
-    print(f"--- Yahoo producer for {interval} sent all messages to {topic_name} ---")
+    print(f"Yahoo producer for {interval} sent all messages to {topic_name}.")
 
 if __name__ == "__main__":
     fetch_and_produce_yahoo_data("1h", "crypto_prices_yahoo_hourly")

@@ -37,7 +37,7 @@ async def produce():
                     "volume_quote": float(data['q']),
                     "best_bid_price": float(data['b']),
                     "best_ask_price": float(data['a']),
-                    "timestamp": int(data['E'] // 1000)  # convert from ms to seconds
+                    "timestamp": int(data['E'] // 1000)  
                 }
 
                 producer.send('crypto_prices', output)

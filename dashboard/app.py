@@ -18,21 +18,19 @@ import uuid
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "your-secret-key-change-this")
 
-# Global chat history storage
-# Structure: {session_id: [{"timestamp": datetime, "question": str, "answer": str}, ...]}
 chat_history = {}
 
 try:
     genai.configure(api_key=os.getenv("GOOGLE_AI_API_KEY"))
     model = genai.GenerativeModel("gemini-2.5-flash-lite")
 except Exception as e:
-    print(f"CẢNH BÁO: Không thể cấu hình Gemini. Lỗi: {e}")
+    print(f"WARNING: Unable to configure Gemini. Error: {e}")
     model = None
 
 try:
     newsapi = NewsApiClient(api_key=os.getenv("NEWS_API_KEY"))
 except Exception as e:
-    print(f"CẢNH BÁO: Không thể cấu hình NewsAPI. Lỗi: {e}")
+    print(f"WARNING: Unable to configure NewsAPI. Error: {e}")
     newsapi = None
 
 CONTEXT_DOCUMENT_ID = "latest_market_context"
@@ -42,7 +40,6 @@ def get_or_create_session_id():
     if 'session_id' not in session:
         session['session_id'] = str(uuid.uuid4())
     return session['session_id']
-
 
 def add_to_chat_history(session_id, question, answer, mood="neutral"):
     """Add a question-answer pair and mood to the chat history"""
@@ -59,7 +56,6 @@ def add_to_chat_history(session_id, question, answer, mood="neutral"):
     # Keep only the last 10 conversations to prevent memory bloat
     if len(chat_history[session_id]) > 10:
         chat_history[session_id] = chat_history[session_id][-10:]
-
 
 def get_chat_history_summary(session_id):
     """Get a formatted summary of recent chat history"""
@@ -178,13 +174,13 @@ def get_historical_data_from_hbase(symbol, limit=200):
         return pd.DataFrame(data)
 
     except Exception as e:
-        print(f"Lỗi khi lấy dữ liệu HBase: {e}")
+        print(f"Error fetching HBase data: {e}")
         return None
 
 def get_and_scrape_news(query="crypto OR bitcoin OR ethereum", days=1, articles_to_fetch=5):
     if not newsapi:
         return {
-            "full_text": "Dịch vụ tin tức chưa được cấu hình.",
+            "full_text": "News service is not configured.",
             "sources_markdown": ""
         }
 
@@ -196,12 +192,12 @@ def get_and_scrape_news(query="crypto OR bitcoin OR ethereum", days=1, articles_
         
         articles = response.get("articles", [])
         if not articles:
-            print(f"[SCRAPER] Không tìm thấy bài báo nào cho query: {query}")
-            return { "full_text": "Không tìm thấy bài báo liên quan.", "sources_markdown": "" }
+            print(f"[SCRAPER] No articles found for query: {query}")
+            return { "full_text": "No related articles found.", "sources_markdown": "" }
 
     except Exception as e:
-        print(f"[SCRAPER] Lỗi khi gọi NewsAPI: {e}")
-        return { "full_text": f"Lỗi khi lấy tin tức: {e}", "sources_markdown": "" }
+        print(f"[SCRAPER] Error calling NewsAPI: {e}")
+        return { "full_text": f"Error fetching news: {e}", "sources_markdown": "" }
 
     full_content_list = []
     sources_markdown_list = []
@@ -215,16 +211,12 @@ def get_and_scrape_news(query="crypto OR bitcoin OR ethereum", days=1, articles_
         url = article.get('url')
         published_at_str = article.get('publishedAt')
         
-        # Chuyển đổi và định dạng ngày tháng
         published_date = ""
         if published_at_str:
             try:
-                # Chuyển chuỗi ISO 8601 "2023-10-27T10:00:00Z" thành đối tượng datetime
                 dt_object = datetime.fromisoformat(published_at_str.replace('Z', '+00:00'))
-                # Định dạng lại thành "YYYY-MM-DD"
                 published_date = dt_object.strftime("%Y-%m-%d")
             except ValueError:
-                # Nếu định dạng ngày tháng không đúng, bỏ qua
                 published_date = ""
         if not url:
             continue
@@ -236,18 +228,17 @@ def get_and_scrape_news(query="crypto OR bitcoin OR ethereum", days=1, articles_
             content = trafilatura.extract(downloaded.text, favor_precision=True, include_comments=False)
 
             if content:
-                full_content_list.append(f"--- ARTICLE START ---\nTITLE: {title}\nURL: {url}\nDATE: {published_date}\nCONTENT:\n{content}\n--- ARTICLE END ---")
+                full_content_list.append(f"ARTICLE START\nTITLE: {title}\nURL: {url}\nDATE: {published_date}\nCONTENT:\n{content}\nARTICLE END")
                 
                 sources_markdown_list.append(f"- [{title}]({url}) ({published_date})")
             else:
-                 print(f"[SCRAPER] Bỏ qua (không trích xuất được nội dung): {url}")
-
+                 print(f"[SCRAPER] Skipping (no content extracted): {url}")
         except Exception as e:
-            print(f"[SCRAPER] Lỗi khi crawl trang {url}: {e}")
+            print(f"[SCRAPER] Error crawling page {url}: {e}")
             continue
 
     if not full_content_list:
-        return { "full_text": "Không crawl được nội dung từ các bài báo đã tìm thấy.", "sources_markdown": "" }
+        return { "full_text": "Unable to crawl content from the found articles.", "sources_markdown": "" }
 
     return {
         "full_text": "\n\n".join(full_content_list),
@@ -255,23 +246,16 @@ def get_and_scrape_news(query="crypto OR bitcoin OR ethereum", days=1, articles_
     }
 
 def calculate_rsi(df, period=14):
-
     delta = df['close'].diff()
-
     gain = delta.where(delta > 0, 0)
     loss = -delta.where(delta < 0, 0)
-
     avg_gain = gain.rolling(window=period, min_periods=1).mean()
     avg_loss = loss.rolling(window=period, min_periods=1).mean()
-
     avg_gain = gain.ewm(com=period - 1, adjust=False).mean()
     avg_loss = loss.ewm(com=period - 1, adjust=False).mean()
     rs = avg_gain / (avg_loss + 1e-9)
-
     rsi = 100 - (100 / (1 + rs))
-    
     return rsi
-
 
 @app.route("/")
 def index():
@@ -307,10 +291,6 @@ def get_crypto(symbol):
     
 @app.route("/api/crypto/history/<string:symbol>", methods=["GET"])
 def get_crypto_history(symbol):
-    """
-    Lấy dữ liệu lịch sử giá của một loại tiền điện tử từ HBase.
-    Chỉ trả về timestamp và giá đóng (close price).
-    """
     try:
         connection = happybase.Connection(
             host=os.getenv("HBASE_THRIFT_HOST", "hbase"),
@@ -320,8 +300,6 @@ def get_crypto_history(symbol):
         table = connection.table("crypto_prices")
         
         row_prefix = f"{symbol.strip().lower()}_".encode("utf-8")
-        
-        # Quét 1000 dòng gần nhất để có đủ dữ liệu vẽ biểu đồ
         rows = table.scan(row_prefix=row_prefix, limit=1000)
 
         result = []
@@ -332,18 +310,15 @@ def get_crypto_history(symbol):
                 price = float(data.get(b'data:price', b'0').decode())
                 result.append({"timestamp": timestamp, "price": price})
             except (ValueError, TypeError):
-                # Bỏ qua các hàng không hợp lệ
                 continue
         
         connection.close()
-
-        # Sắp xếp dữ liệu theo timestamp tăng dần
         result.sort(key=lambda x: x['timestamp'])
 
         return jsonify(result) if result else jsonify({"message": f"No historical data for {symbol}"})
 
     except Exception as e:
-        print(f"[ERROR] Lỗi khi lấy dữ liệu lịch sử cho {symbol}: {e}")
+        print(f"[ERROR] Error fetching historical data for {symbol}: {e}")
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
@@ -357,10 +332,7 @@ def predict_realtime(symbol):
         connection.open()
         table = connection.table("crypto_prices")
 
-        # Prefix: ví dụ "btcusdt_"
         row_prefix = f"{symbol.lower()}_".encode("utf-8")
-
-        # Quét dữ liệu mới nhất (ví dụ 200 dòng)
         rows = table.scan(row_prefix=row_prefix, limit=200)
 
         data = []
@@ -380,9 +352,7 @@ def predict_realtime(symbol):
         if not data:
             return jsonify({"error": "No recent data found in HBase"}), 400
 
-        # Sắp xếp tăng dần theo timestamp
         data = sorted(data, key=lambda x: x.get("timestamp", 0))
-
         latest_row = data[-1]
         required_keys = ["open_price", "high_price", "low_price", "volume_token"]
 
@@ -398,7 +368,6 @@ def predict_realtime(symbol):
 
         model_path = f"models/xgboost_{symbol.lower()}.pkl"
 
-        # Nếu model chưa có local, có thể lấy từ HDFS (tuỳ cấu hình)
         if not os.path.exists(model_path):
             hdfs_path = f"hdfs://hdfs-namenode:8020/models/xgboost_{symbol.lower()}.pkl"
             os.system(f"hadoop fs -get -f {hdfs_path} {model_path}")
@@ -426,7 +395,6 @@ def predict_realtime(symbol):
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
-
 @app.route("/api/chatbot/ask", methods=["POST"])
 def ask_chatbot():
     if not model:
@@ -439,7 +407,6 @@ def ask_chatbot():
     session_id = get_or_create_session_id()
     chat_history_summary = get_chat_history_summary(session_id)
     
-    # 1. NEW: Get intent and entities from the AI model
     intent_data = get_intent_from_prompt(user_question, chat_history_summary)
     intent = intent_data.get("intent")
     crypto_topic = intent_data.get("crypto_topic")
@@ -453,7 +420,6 @@ def ask_chatbot():
 
     if intent == "crypto_question" and is_calculation:
         print("[CHATBOT] Handling a crypto calculation/logic question.")
-        # PROMPT ĐÃ ĐƯỢC NÂNG CẤP ĐỂ YÊU CẦU GIẢI THÍCH
         calc_prompt = f"""
             You are a helpful and clear-thinking AI assistant with expertise in finance and mathematics.
             The user has a question that requires calculation or logical reasoning related to cryptocurrency.
@@ -483,10 +449,8 @@ def ask_chatbot():
             add_to_chat_history(session_id, user_question, answer, user_mood)
             return jsonify({"answer": answer})
 
-    # 2. Handle non-crypto intents directly
     if intent in ["greeting", "general_question", "irrelevant_question", "contextual_question"]:
         answer = ""
-        # Create a simple prompt for these cases
         print(f"[CHATBOT] Handling simple intent '{intent}' in {user_language}.")
         simple_prompt = f"""
             You are a helpful crypto analyst AI. Your task is to provide a simple, direct response based on the user's intent.
@@ -517,8 +481,6 @@ def ask_chatbot():
         add_to_chat_history(session_id, user_question, answer, user_mood)
         return jsonify({"answer": answer})
 
-
-    # 3. For crypto questions, proceed with data gathering
     all_symbols = ["btcusdt", "ethusdt", "bnbusdt", "solusdt", "xrpusdt", "adausdt", "dogeusdt", "linkusdt", "dotusdt", "ltcusdt"]
     coin_name_map = {
         "bitcoin": "btcusdt", "ethereum": "ethusdt", "binance coin": "bnbusdt",
@@ -531,7 +493,6 @@ def ask_chatbot():
     if crypto_topic and crypto_topic.lower() in coin_name_map:
         target_symbol = coin_name_map[crypto_topic.lower()]
     
-    # Fetch news based on the detected topic
     if crypto_topic and crypto_topic != "General" and crypto_topic != "None":
         news_query = f'"{crypto_topic}"'
         print(f"[CHATBOT] Crawling news with specific query: {news_query}")
@@ -544,7 +505,6 @@ def ask_chatbot():
     sources_list_markdown = news_data.get("sources_markdown")
     has_relevant_news = bool(sources_list_markdown)
 
-    # 4. Build Market Snapshot
     market_snapshot_data = []
     try:
         connection = happybase.Connection(host=os.getenv("HBASE_THRIFT_HOST", "hbase"), port=int(os.getenv("HBASE_THRIFT_PORT", "9090")))
@@ -567,7 +527,6 @@ def ask_chatbot():
     except Exception as e:
         formatted_data_summary = f"Error retrieving market snapshot: {e}"
 
-    # 5. Perform Technical Analysis if a specific coin is targeted
     technical_analysis_summary = "No specific coin was targeted for technical analysis."
     if target_symbol:
         df_history = get_historical_data_from_hbase(target_symbol, limit=50)
@@ -590,7 +549,6 @@ def ask_chatbot():
 - **Recent Low (Support):** ${df_history['low'].min():.4f}
 """
 
-    # 6. Generate the Final Prompt for the AI
     prompt = ""
     language_instruction = f"You MUST formulate your entire response in {user_language}."
 
@@ -601,9 +559,7 @@ def ask_chatbot():
         IMPORTANT FINAL INSTRUCTION: The user's original question was "{user_question}". You have correctly focused on analyzing the crypto-related part. After providing your full, comprehensive analysis, you MUST add a concluding sentence at the very end. This sentence should politely state that the other topics in their original question are outside your expertise as a crypto analyst.
         """
 
-    # Tạo Prompt cho Gemini
     if has_relevant_news:
-        # Nếu CÓ tin-tức, dùng prompt đầy-đủ
         print("[CHATBOT] Found relevant news. Using full prompt.")
         prompt = f"""
         You are an expert crypto market analyst. Your analysis must be technical and data-driven.
@@ -656,7 +612,6 @@ def ask_chatbot():
         **Your Expert Answer:**
         """
     else:
-        # Nếu KHÔNG có tin-tức, dùng prompt rút-gọn
         print("[CHATBOT] No relevant news found. Using technical-only prompt.")
         prompt = f"""
         You are an expert crypto market analyst. Your analysis must be technical and data-driven.
@@ -690,7 +645,6 @@ def ask_chatbot():
         **Your Expert Answer:**
         """
 
-    # 7. Call Gemini API and return the answer
     try:
         response = model.generate_content(prompt)
         final_answer = response.text
@@ -712,7 +666,6 @@ def get_chat_history():
     
     return jsonify({"history": chat_history[session_id]})
 
-
 @app.route("/api/chatbot/clear", methods=["POST"])
 def clear_chat_history():
     """Clear the chat history for the current session"""
@@ -730,11 +683,3 @@ def serve_static(filename):
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
-
-
-
-
-
-
-
-

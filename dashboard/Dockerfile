@@ -8,6 +8,5 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY dashboard /app
 COPY ../../dashboard/static /app/static
-#COPY ../../models /app/models
 
 CMD ["python", "app.py"]

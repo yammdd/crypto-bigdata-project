@@ -172,7 +172,7 @@ def get_mongodb_data():
         st.error(f"Failed to connect to MongoDB: {e}")
         return []
     
-@st.cache_data(ttl=300)  # Cache 5 phút cho historical data
+@st.cache_data(ttl=300)  # Cache 5 minutes for historical data
 def get_historical_data():
     try:
         client = MongoClient("mongodb://mongodb:27017", serverSelectionTimeoutMS=10000)
@@ -191,7 +191,7 @@ with st.spinner("Loading historicaldata"):
     historical_data = get_historical_data()
 
 if not data:
-    st.error("❌ No data found in MongoDB. Please ensure the batch processing pipeline is running.")
+    st.error("No data found in MongoDB. Please ensure the batch processing pipeline is running.")
     st.stop()
 
 df = pd.DataFrame(data)
@@ -286,28 +286,22 @@ with tabs[0]:  # Tab Historical Price Trends
     
     # Check historical data
     if not historical_data:
-        st.error("❌ No historical data found in MongoDB collection 'historical_prices'. Ensure the HDFS → MongoDB loading script has run successfully.")
-        st.info("💡 Run the HDFS → MongoDB data loading script to populate historical data.")
+        st.error("No historical data found in MongoDB collection 'historical_prices'. Ensure the HDFS → MongoDB loading script has run successfully.")
+        st.info("Run the HDFS → MongoDB data loading script to populate historical data.")
         st.stop()
     
     # Convert to DataFrame
     if historical_data:
         df_historical = pd.DataFrame(historical_data)
-        # Convert datetime string to datetime object
         df_historical['datetime'] = pd.to_datetime(df_historical['datetime'])
-        # Convert symbols to uppercase
         df_historical['symbol'] = df_historical['symbol'].str.upper()
-        # Sort by symbol and datetime
         df_historical = df_historical.sort_values(['symbol', 'datetime'])
         
-        # Get unique symbols list
         available_symbols = sorted(df_historical['symbol'].unique())
         
         if len(available_symbols) == 0:
-            st.error("❌ No symbols found in historical data.")
+            st.error("No symbols found in historical data.")
             st.stop()
-        
-        #st.success(f"✅ Loaded {len(df_historical):,} historical records for {len(available_symbols)} cryptocurrencies.")
         
         # Dropdown to select 1 symbol
         st.markdown("### Select Cryptocurrency")
@@ -322,7 +316,7 @@ with tabs[0]:  # Tab Historical Price Trends
         symbol_data = df_historical[df_historical['symbol'] == selected_symbol]
         
         if len(symbol_data) == 0:
-            st.error(f"❌ No data available for {selected_symbol}.")
+            st.error(f"No data available for {selected_symbol}.")
             st.stop()
         
         # Time range filter for this symbol
@@ -352,7 +346,7 @@ with tabs[0]:  # Tab Historical Price Trends
         ].copy()
         
         if len(filtered_data) == 0:
-            st.warning(f"⚠️ No data available in '{time_range}' period for {selected_symbol}.")
+            st.warning(f"No data available in '{time_range}' period for {selected_symbol}.")
             st.stop()
         
         # Simple price line chart (only 1 line)
@@ -372,7 +366,7 @@ with tabs[0]:  # Tab Historical Price Trends
                          'Price: $%{y:.4f}<extra></extra>'
         ))
         
-        # Add average line as reference (optional, simple dashed line)
+        # Add average line as reference
         avg_price = filtered_data['close'].mean()
         fig_price.add_hline(
             y=avg_price,
@@ -448,7 +442,7 @@ with tabs[0]:  # Tab Historical Price Trends
         st.markdown(f"**Last Updated:** {pd.Timestamp.now('Asia/Bangkok').strftime('%Y-%m-%d %H:%M:%S')}")
         
     else:
-        st.error("❌ Error processing historical data from MongoDB.")
+        st.error("Error processing historical data from MongoDB.")
 
 with tabs[1]:
     st.markdown("### Prediction Overview")
@@ -466,8 +460,6 @@ with tabs[1]:
         st.plotly_chart(fig_conf, use_container_width=True)
     
     with col2:
-        # Price predictions vs current prices
-        # Ensure confidence_score is positive for size
         df_pred_clean = df.copy()
         df_pred_clean['confidence_score_abs'] = np.abs(df_pred_clean['confidence_score'])
         df_pred_clean['confidence_score_abs'] = np.maximum(df_pred_clean['confidence_score_abs'], 0.1)  # Minimum size
@@ -532,7 +524,6 @@ with tabs[2]:
     col1, col2 = st.columns(2)
     
     with col1:
-        # Price change distribution
         fig_change = px.histogram(df, x='prediction_change_pct', nbins=20,
                                 title="Price Change Distribution",
                                 color_discrete_sequence=['#667eea'])
@@ -541,8 +532,6 @@ with tabs[2]:
         st.plotly_chart(fig_change, use_container_width=True)
     
     with col2:
-        # Volatility vs price change
-        # Ensure volume is positive for size
         df_vol_clean = df.copy()
         df_vol_clean['volume_abs'] = np.abs(df_vol_clean['volume'])
         df_vol_clean['volume_abs'] = np.maximum(df_vol_clean['volume_abs'], 1000)  # Minimum size
@@ -645,8 +634,6 @@ with tabs[4]:
     
     st.plotly_chart(fig_perf, use_container_width=True)
     
-    # Performance vs confidence
-    # Ensure mape is positive for size
     df_perf_clean = df.copy()
     df_perf_clean['mape_abs'] = np.abs(df_perf_clean['mape'])
     df_perf_clean['mape_abs'] = np.maximum(df_perf_clean['mape_abs'], 0.1)  # Minimum size
@@ -659,8 +646,6 @@ with tabs[4]:
 
 with tabs[5]:
     st.markdown("### Portfolio Insights")
-    
-    # Portfolio allocation recommendations
     st.markdown("#### Recommended Portfolio Allocation")
     
     # Calculate portfolio weights based on confidence and expected returns
@@ -685,8 +670,6 @@ with tabs[5]:
                           color_discrete_sequence=px.colors.qualitative.Set3)
     st.plotly_chart(fig_portfolio, use_container_width=True)
     
-    # Risk-return scatter
-    # Handle negative values for size by using absolute values and adding a minimum size
     df_portfolio_clean = df_portfolio.copy()
     df_portfolio_clean['portfolio_weight_abs'] = np.abs(df_portfolio_clean['portfolio_weight'])
     df_portfolio_clean['portfolio_weight_abs'] = np.maximum(df_portfolio_clean['portfolio_weight_abs'], 0.01)  # Minimum size
@@ -799,7 +782,7 @@ with tabs[6]:
                                color_continuous_scale='Reds')
             st.plotly_chart(fig_missing, use_container_width=True)
         else:
-            st.success("✅ No missing data detected")
+            st.success("No missing data detected")
     
     with quality_col2:
         # Data distribution
@@ -871,19 +854,19 @@ with tabs[6]:
     recommendations = []
     
     if df['confidence_score'].mean() < 0.6:
-        recommendations.append("⚠️ Low average confidence score - consider model retraining")
+        recommendations.append("Low average confidence score - consider model retraining")
     
     if len(df[df['prediction_confidence'] == 'low']) > len(df) * 0.5:
-        recommendations.append("⚠️ High number of low-confidence predictions - review feature engineering")
+        recommendations.append("High number of low-confidence predictions - review feature engineering")
     
     if df['volatility_ratio'].mean() > 0.2:
-        recommendations.append("⚠️ High market volatility detected - consider risk management")
+        recommendations.append("High market volatility detected - consider risk management")
     
     if len(df) < 5:
-        recommendations.append("⚠️ Limited data points - ensure all models are running")
+        recommendations.append("Limited data points - ensure all models are running")
     
     if not recommendations:
-        st.success("✅ All systems operating normally")
+        st.success("All systems operating normally")
     else:
         for rec in recommendations:
             st.warning(rec)
