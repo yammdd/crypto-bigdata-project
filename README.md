@@ -112,7 +112,7 @@ This pipeline will:
 ## 💻 Demo Videos:
 ### Batch Layer:
 
-https://github.com/user-attachments/assets/bafc919b-4ea8-435b-b037-c6fa3cfa0368
+https://github.com/user-attachments/assets/4d2b25cb-9c87-4685-a5b5-dd1f878acbb5
 
 ### Stream Layer:
 
