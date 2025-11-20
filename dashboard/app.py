@@ -273,7 +273,7 @@ def get_crypto(symbol):
 
         table = connection.table("crypto_prices")
         row_prefix = f"{symbol.strip().lower()}_".encode("utf-8")
-        rows = table.scan(row_prefix=row_prefix)
+        rows = table.scan(row_prefix=row_prefix, limit=1, reverse=True)
 
         result = []
         for key, data in rows:
@@ -300,7 +300,7 @@ def get_crypto_history(symbol):
         table = connection.table("crypto_prices")
         
         row_prefix = f"{symbol.strip().lower()}_".encode("utf-8")
-        rows = table.scan(row_prefix=row_prefix, limit=1000)
+        rows = table.scan(row_prefix=row_prefix, reverse=True)
 
         result = []
         for key, data in rows:
@@ -313,7 +313,7 @@ def get_crypto_history(symbol):
                 continue
         
         connection.close()
-        result.sort(key=lambda x: x['timestamp'])
+        result.reverse()
 
         return jsonify(result) if result else jsonify({"message": f"No historical data for {symbol}"})
 
