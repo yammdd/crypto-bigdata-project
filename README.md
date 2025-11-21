@@ -112,7 +112,7 @@ This pipeline will:
 ## 💻 Demo Videos:
 ### Batch Layer:
 
-https://github.com/user-attachments/assets/4d2b25cb-9c87-4685-a5b5-dd1f878acbb5
+https://github.com/user-attachments/assets/18b6fd45-84eb-403b-9b33-baee48d5f449
 
 ### Stream Layer:
 
@@ -174,5 +174,5 @@ https://github.com/user-attachments/assets/7248c9d8-cfac-4a55-977d-240eaebbae8d
 
 ---
 
-## Notes:
+## 📝 Notes
 > We also wrote a LaTeX report for this project. Refer to the file `REPORT_EN.pdf` in English and `REPORT_VI.pdf` in Vietnamese.
