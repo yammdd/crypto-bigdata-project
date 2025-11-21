@@ -175,4 +175,4 @@ https://github.com/user-attachments/assets/c7a76e66-c973-4aff-b86e-f109348d3b97
 ---
 
 ## Notes:
-> We also wrote a LaTeX report for this project. Refer to the file `bigdata_final_report.pdf`.
+> We also wrote a LaTeX report for this project. Refer to the file `REPORT_EN.pdf` in English and `REPORT_VI.pdf` in Vietnamese.

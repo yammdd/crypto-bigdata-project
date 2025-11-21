@@ -3,7 +3,7 @@ __pycache__/
 *.pyo
 *.pyd
 *.egg-info/
-.env
+#.env
 *.log
 
 hbase-data/
