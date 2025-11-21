@@ -109,12 +109,12 @@ This pipeline will:
 | 🟢 **Batch Dashboard (Streamlit)** | • Historical trend analysis<br>• Model metrics (RMSE, MAPE, MAE)<br>• Risk dashboard<br>• Portfolio allocation<br>• Data explorer | http://localhost:8501 |
 
 ---
-## 💻 Demo Videos:
-### Batch Layer:
+## 💻 Demo Videos
+### Batch Layer
 
 https://github.com/user-attachments/assets/18b6fd45-84eb-403b-9b33-baee48d5f449
 
-### Stream Layer:
+### Stream Layer
 
 https://github.com/user-attachments/assets/7248c9d8-cfac-4a55-977d-240eaebbae8d
 
