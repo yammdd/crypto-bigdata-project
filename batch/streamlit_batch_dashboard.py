@@ -417,12 +417,16 @@ with tabs[0]:  # Tab Historical Price Trends
         st.markdown("### 📥 Download Data")
         
         # Prepare export data (only essential columns)
-        export_data = filtered_data[['symbol', 'datetime', 'close']].copy()
+        export_data = filtered_data[['symbol', 'datetime', 'open', 'high', 'low','close', 'volume']].copy()
         export_data['datetime'] = export_data['datetime'].dt.strftime('%Y-%m-%d %H:%M:%S')
         export_data = export_data.rename(columns={
-            'symbol': 'Symbol',
-            'datetime': 'DateTime',
-            'close': 'ClosePrice'
+            'symbol': 'symbol',
+            'datetime': 'datetime',
+            'open': 'openprice',
+            'high': 'highprice',
+            'low': 'lowprice',
+            'close': 'closeprice',
+            'volume': 'volume'
         })
         
         csv_data = export_data.to_csv(index=False)
