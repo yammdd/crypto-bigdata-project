@@ -94,21 +94,21 @@ st.markdown("""
         height: 50px;
         padding-left: 20px;
         padding-right: 20px;
-        background: #f8f9fa;
+        background: #f0f2f5;
         border-radius: 5px 5px 0 0;
     }
     
     .stTabs [aria-selected="true"] {
-        background: #667eea;
+        background: #b6c3fc;
         color: white;
     }
     
     .stTabs [data-baseweb="tab"] {
-        color: #2c3e50 !important;
+        color: #2369ad !important;
     }
     
     .stTabs [data-baseweb="tab"]:hover {
-        color: #e74c3c !important;
+        color: #fc6151 !important;
     }
 </style>
 """, unsafe_allow_html=True)
